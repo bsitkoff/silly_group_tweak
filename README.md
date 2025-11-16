@@ -43,11 +43,19 @@ Two modes of operation:
 ### Chair Mode
 
 1. **User sends a message** in a group chat
-2. **Only the chair character responds** automatically
+2. **Extension programmatically forces the chair character to respond** (using SillyTavern's `force_chid` API)
 3. **Chair calls on other characters** by name in their message (e.g., "I call on Willow", "Willow, your turn")
-4. **Extension detects the call-on** and allows only that character to respond next
-5. **Control returns to chair** after the called character responds
+4. **Extension detects the call-on** and programmatically forces only that character to respond next
+5. **Control returns to chair** for the next user message (called character does not continue speaking)
 6. **Brevity instructions** keep all responses concise
+
+**How it works under the hood:**
+- The extension aborts SillyTavern's normal character selection in Chair Mode
+- When a user sends a message, the extension listens for the `MESSAGE_SENT` event and programmatically calls `Generate('normal', { force_chid: chairCharacterId })` to force the chair to respond
+- When the chair's generation completes, the extension checks if they called on another character
+- If a character was called on, the extension forces that character to generate using `force_chid`
+- After the called character responds, the extension waits for the next user message (control doesn't auto-return to chair until user speaks again)
+- This ensures **only one character speaks at a time** - exactly the one that should speak according to Chair Mode rules
 
 ### Keyword Mode (Original)
 
@@ -223,8 +231,15 @@ Edit the "Brevity Instruction" textarea in settings. Changes save automatically.
 - Customize `brevity_instruction` to be more specific
 
 **Chair character not working:**
-- Ensure chair character name matches exactly
+- Ensure chair character name matches exactly (case-sensitive)
 - Check that character exists in the group chat
+- Verify Chair Mode is enabled in settings
+- Check browser console (F12) for Chair Mode debug logs
+
+**Multiple characters speaking in Chair Mode:**
+- This should no longer happen with the new implementation
+- The extension now uses programmatic `force_chid` to ensure only one character speaks at a time
+- If you still see multiple characters, check console for errors and verify the extension is properly loaded
 
 ## Debug Mode
 
