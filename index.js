@@ -262,7 +262,7 @@
     }
 
     /**
-     * Update the chair sprite dropdown with available sprites
+     * Update the chair sprite dropdown with actual group members
      */
     function updateChairSpriteDropdown() {
         const dropdown = $('#sprite-council-chair-sprite');
@@ -271,10 +271,33 @@
         dropdown.empty();
         dropdown.append('<option value="">None (random selection)</option>');
 
-        const sprites = Object.keys(spriteCouncilSettings.sprite_domains);
-        for (const spriteName of sprites) {
-            const selected = spriteName === currentChair ? 'selected' : '';
-            dropdown.append(`<option value="${spriteName}" ${selected}>${spriteName}</option>`);
+        // Try to get actual group members from context
+        const groupMembers = getGroupMemberNames();
+
+        if (groupMembers && groupMembers.length > 0) {
+            // We have a group - show actual members
+            for (const memberName of groupMembers) {
+                const hasDomain = spriteCouncilSettings.sprite_domains[memberName] !== undefined;
+                const label = hasDomain ? `${memberName} ✓` : memberName;
+                const selected = memberName === currentChair ? 'selected' : '';
+                dropdown.append(`<option value="${memberName}" ${selected}>${label}</option>`);
+            }
+        } else {
+            // No group detected - fall back to configured sprites
+            const sprites = Object.keys(spriteCouncilSettings.sprite_domains);
+            if (sprites.length > 0) {
+                dropdown.append('<option disabled>──────────</option>');
+                dropdown.append('<option disabled>No group chat active</option>');
+                dropdown.append('<option disabled>Showing configured characters:</option>');
+                dropdown.append('<option disabled>──────────</option>');
+                for (const spriteName of sprites) {
+                    const selected = spriteName === currentChair ? 'selected' : '';
+                    dropdown.append(`<option value="${spriteName}" ${selected}>${spriteName}</option>`);
+                }
+            } else {
+                dropdown.append('<option disabled>──────────</option>');
+                dropdown.append('<option disabled>Open a group chat or add characters</option>');
+            }
         }
     }
 
@@ -367,11 +390,11 @@
 
                         <!-- Chair Sprite -->
                         <div class="sprite-council-setting">
-                            <label for="sprite-council-chair-sprite">Chair Sprite (Default/Fallback)</label>
+                            <label for="sprite-council-chair-sprite">Chair Character (Default/Fallback)</label>
                             <select id="sprite-council-chair-sprite" class="text_pole">
                                 <option value="">None (random selection)</option>
                             </select>
-                            <small>This sprite responds when no others match, or when their keywords match</small>
+                            <small>Shows all characters in the current group. ✓ = has keywords configured. This character responds when no others match, or when their keywords match.</small>
                         </div>
 
                         <!-- Brevity Settings -->
@@ -565,7 +588,7 @@
         bindUIEvents();
         loadSettingsToUI();
 
-        // Listen to MESSAGE_SENT to track user messages
+        // Listen to events
         if (window.eventSource) {
             eventSource.on('MESSAGE_SENT', () => {
                 console.log('[Sprite Council] User message sent');
@@ -574,7 +597,26 @@
             eventSource.on('GENERATION_ENDED', () => {
                 console.log('[Sprite Council] Generation ended');
             });
+
+            // Update chair dropdown when group chat changes
+            eventSource.on('CHAT_CHANGED', () => {
+                console.log('[Sprite Council] Chat changed - updating chair dropdown');
+                updateChairSpriteDropdown();
+            });
+
+            // Also update when characters are added/removed from group
+            eventSource.on('GROUP_UPDATED', () => {
+                console.log('[Sprite Council] Group updated - updating chair dropdown');
+                updateChairSpriteDropdown();
+            });
         }
+
+        // Update dropdown when settings panel is opened
+        $(document).on('click', '#sprite-council-settings .inline-drawer-toggle', function() {
+            setTimeout(() => {
+                updateChairSpriteDropdown();
+            }, 100);
+        });
 
         console.log('[Sprite Council] Initialization complete');
     }

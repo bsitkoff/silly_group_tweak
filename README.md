@@ -52,8 +52,10 @@ No hardcoded character names - you configure everything through the UI:
 
 1. **Add a character**: Type the character name (must match exactly) and click "Add Sprite"
 2. **Add keywords**: Enter comma-separated keywords that should trigger this character
-3. **Set chair character** (optional): Select which character should be the default from the dropdown
+3. **Set chair character** (optional): The dropdown shows all characters in your current group chat. Characters with a ✓ have keywords configured. Select which character should be the default/fallback.
 4. **Adjust settings**: Use the sliders and toggles to fine-tune behavior
+
+**Note:** The chair character dropdown automatically updates when you switch group chats, so you can easily select from whoever is in your current group.
 
 ## Installation
 
