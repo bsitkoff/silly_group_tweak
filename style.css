@@ -1,0 +1,22 @@
+/**
+ * Sprite Council Extension Styles
+ * Currently no custom UI elements, but placeholder for future settings panel
+ */
+
+.sprite-council-settings {
+    padding: 10px;
+    margin: 10px 0;
+    background-color: var(--SmartThemeBlurTintColor);
+    border-radius: 5px;
+}
+
+.sprite-council-settings label {
+    display: block;
+    margin-bottom: 5px;
+}
+
+.sprite-council-settings input,
+.sprite-council-settings textarea {
+    width: 100%;
+    margin-bottom: 10px;
+}

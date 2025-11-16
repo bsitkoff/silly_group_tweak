@@ -1,0 +1,25 @@
+{
+  "name": "sillytavern-sprite-council",
+  "version": "1.0.0",
+  "description": "SillyTavern extension that acts as a DM for sprite group chats - routes messages, limits speakers, enforces brevity",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"No tests yet\" && exit 0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bsitkoff/silly_group_tweak"
+  },
+  "keywords": [
+    "sillytavern",
+    "extension",
+    "group-chat",
+    "ai",
+    "chatbot",
+    "sprites"
+  ],
+  "author": "bsitkoff",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {}
+}

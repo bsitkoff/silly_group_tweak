@@ -1,0 +1,68 @@
+{
+  "enabled": true,
+  "max_speakers": 2,
+  "brevity_enabled": true,
+  "brevity_instruction": "Reply in 3-5 sentences max unless the user specifically asks for more detail.",
+  "chair_sprite": "Pip",
+  "sprite_domains": {
+    "Pip": [
+      "plan",
+      "schedule",
+      "time",
+      "task",
+      "overwhelmed",
+      "organize",
+      "manage",
+      "prioritize",
+      "deadline"
+    ],
+    "Saffron": [
+      "food",
+      "dinner",
+      "meal",
+      "hungry",
+      "cooking",
+      "recipe",
+      "eat",
+      "breakfast",
+      "lunch",
+      "snack"
+    ],
+    "Echo": [
+      "feelings",
+      "sad",
+      "anxious",
+      "emotion",
+      "feel",
+      "afraid",
+      "worried",
+      "happy",
+      "scared",
+      "lonely"
+    ],
+    "Knot": [
+      "info",
+      "research",
+      "explain",
+      "study",
+      "learn",
+      "understand",
+      "how",
+      "why",
+      "what",
+      "knowledge"
+    ],
+    "Quorum": [
+      "decide",
+      "choice",
+      "pick",
+      "choose",
+      "decision",
+      "should",
+      "option",
+      "select",
+      "vote"
+    ]
+  },
+  "_comment": "Copy this file to config.json and customize for your sprite council. Add your own sprites and keywords!"
+}
