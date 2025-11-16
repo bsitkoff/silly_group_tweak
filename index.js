@@ -163,6 +163,74 @@
     }
 
     /**
+     * Get the character ID for a character name in the current group
+     */
+    function getCharacterIdByName(characterName) {
+        try {
+            const context = SillyTavern.getContext();
+            if (!context.groupId) return null;
+
+            const group = context.groups.find(g => g.id === context.groupId);
+            if (!group) return null;
+
+            // Find the character by name and return their avatar ID (used as chid)
+            for (const memberId of group.members) {
+                const char = context.characters.find(c => c.avatar === memberId);
+                if (char && char.name === characterName) {
+                    // Return the index in the characters array which is used as chid
+                    return context.characters.indexOf(char);
+                }
+            }
+
+            return null;
+        } catch (error) {
+            console.error('[Sprite Council] Error getting character ID:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Determine which character should speak next in Chair Mode
+     */
+    function getNextChairModeSpeaker(chat, groupMembers, chairSprite) {
+        // Find the last non-system message
+        let lastMessage = null;
+        for (let i = chat.length - 1; i >= 0; i--) {
+            if (chat[i].mes && !chat[i].is_system) {
+                lastMessage = chat[i];
+                break;
+            }
+        }
+
+        if (!lastMessage) {
+            // No messages yet, default to chair
+            return chairSprite;
+        } else if (lastMessage.is_user) {
+            // User just spoke → only chair should respond
+            return chairSprite;
+        } else {
+            // Last message from a character
+            const lastSpeaker = lastMessage.name;
+
+            if (lastSpeaker === chairSprite) {
+                // Chair just spoke → check if they called on someone
+                const calledSprite = detectCalledSprite(lastMessage.mes, groupMembers);
+                if (calledSprite) {
+                    console.log(`[Sprite Council] Chair called on ${calledSprite}`);
+                    return calledSprite;
+                } else {
+                    // Chair spoke but didn't call anyone → chair continues
+                    return chairSprite;
+                }
+            } else {
+                // Someone other than chair spoke → yield back to chair
+                console.log(`[Sprite Council] ${lastSpeaker} spoke → yielding back to chair`);
+                return chairSprite;
+            }
+        }
+    }
+
+    /**
      * Generation interceptor - runs before each generation
      * This is where we inject our routing logic and brevity instructions
      */
@@ -182,49 +250,17 @@
             const chairSprite = spriteCouncilSettings.chair_sprite;
             let selectedSprites = [];
 
-            // CHAIR MODE: Turn-based control where only chair or called-on sprite speaks
+            // CHAIR MODE: Manual control with forced generation
             if (spriteCouncilSettings.chair_mode && chairSprite) {
                 console.log('[Sprite Council] Chair mode active, chair:', chairSprite);
 
-                // Find the last message (user or character)
-                let lastMessage = null;
-                let lastMessageIndex = -1;
-                for (let i = chat.length - 1; i >= 0; i--) {
-                    if (chat[i].mes && !chat[i].is_system) {
-                        lastMessage = chat[i];
-                        lastMessageIndex = i;
-                        break;
-                    }
-                }
+                // In Chair Mode, we handle generation via MESSAGE_SENT event
+                // The interceptor only adds brevity instruction
+                // Character selection is controlled by forced generation
 
-                if (!lastMessage) {
-                    // No messages yet, default to chair
-                    selectedSprites = [chairSprite];
-                } else if (lastMessage.is_user) {
-                    // User just spoke → only chair should respond
-                    selectedSprites = [chairSprite];
-                    console.log('[Sprite Council] Last message from user → selecting chair only');
-                } else {
-                    // Last message from a character
-                    const lastSpeaker = lastMessage.name;
-
-                    if (lastSpeaker === chairSprite) {
-                        // Chair just spoke → check if they called on someone
-                        const calledSprite = detectCalledSprite(lastMessage.mes, groupMembers);
-                        if (calledSprite) {
-                            selectedSprites = [calledSprite];
-                            console.log(`[Sprite Council] Chair called on ${calledSprite} → selecting them only`);
-                        } else {
-                            // Chair spoke but didn't call anyone → chair continues
-                            selectedSprites = [chairSprite];
-                            console.log('[Sprite Council] Chair spoke but called no one → chair continues');
-                        }
-                    } else {
-                        // Someone other than chair spoke → yield back to chair
-                        selectedSprites = [chairSprite];
-                        console.log(`[Sprite Council] ${lastSpeaker} spoke → yielding back to chair`);
-                    }
-                }
+                // Abort auto-generation - we'll handle it manually
+                abort(true);
+                return;
             }
             // KEYWORD MODE: Original behavior - select based on keywords
             else {
@@ -837,6 +873,127 @@
     }
 
     /**
+     * Handle generation in Chair Mode by forcing the correct character
+     */
+    function handleChairModeGeneration() {
+        try {
+            const context = SillyTavern.getContext();
+
+            // Make sure we're in a group chat
+            if (!context.groupId) {
+                console.log('[Sprite Council] Not in a group chat, skipping Chair Mode handling');
+                return;
+            }
+
+            const groupMembers = getGroupMemberNames();
+            if (!groupMembers || groupMembers.length === 0) {
+                console.log('[Sprite Council] No group members found');
+                return;
+            }
+
+            const chairSprite = spriteCouncilSettings.chair_sprite;
+            if (!chairSprite) {
+                console.log('[Sprite Council] No chair sprite configured');
+                return;
+            }
+
+            // Determine which character should speak next
+            const nextSpeaker = getNextChairModeSpeaker(context.chat, groupMembers, chairSprite);
+            console.log('[Sprite Council] Next speaker in Chair Mode:', nextSpeaker);
+
+            // Get the character ID for the next speaker
+            const chid = getCharacterIdByName(nextSpeaker);
+            if (chid === null) {
+                console.error('[Sprite Council] Could not find character ID for:', nextSpeaker);
+                return;
+            }
+
+            console.log('[Sprite Council] Forcing generation for character ID:', chid);
+
+            // Force generation for this specific character
+            // Using the global Generate function with force_chid parameter
+            if (typeof Generate === 'function') {
+                Generate('normal', { force_chid: chid });
+            } else {
+                console.error('[Sprite Council] Generate function not available');
+            }
+
+        } catch (error) {
+            console.error('[Sprite Council] Error in handleChairModeGeneration:', error);
+        }
+    }
+
+    /**
+     * Handle what happens after a character generation completes in Chair Mode
+     * If the chair just called on someone, trigger that person's generation
+     */
+    function handleChairModeAfterGeneration() {
+        try {
+            const context = SillyTavern.getContext();
+
+            // Make sure we're in a group chat
+            if (!context.groupId) {
+                return;
+            }
+
+            const groupMembers = getGroupMemberNames();
+            if (!groupMembers || groupMembers.length === 0) {
+                return;
+            }
+
+            const chairSprite = spriteCouncilSettings.chair_sprite;
+            if (!chairSprite) {
+                return;
+            }
+
+            // Find the last non-system message
+            let lastMessage = null;
+            for (let i = context.chat.length - 1; i >= 0; i--) {
+                if (context.chat[i].mes && !context.chat[i].is_system) {
+                    lastMessage = context.chat[i];
+                    break;
+                }
+            }
+
+            if (!lastMessage || lastMessage.is_user) {
+                // Last message is from user or doesn't exist, nothing to do
+                return;
+            }
+
+            const lastSpeaker = lastMessage.name;
+
+            // Only proceed if the last speaker was the chair
+            if (lastSpeaker === chairSprite) {
+                // Check if the chair called on someone
+                const calledSprite = detectCalledSprite(lastMessage.mes, groupMembers);
+                if (calledSprite) {
+                    console.log(`[Sprite Council] Chair called on ${calledSprite}, triggering their response`);
+
+                    // Get the character ID for the called sprite
+                    const chid = getCharacterIdByName(calledSprite);
+                    if (chid === null) {
+                        console.error('[Sprite Council] Could not find character ID for:', calledSprite);
+                        return;
+                    }
+
+                    // Force generation for the called character
+                    if (typeof Generate === 'function') {
+                        Generate('normal', { force_chid: chid });
+                    } else {
+                        console.error('[Sprite Council] Generate function not available');
+                    }
+                }
+                // If chair didn't call on anyone, we don't auto-generate
+                // Wait for next user message
+            }
+            // If last speaker was not the chair, we also wait for next user message
+
+        } catch (error) {
+            console.error('[Sprite Council] Error in handleChairModeAfterGeneration:', error);
+        }
+    }
+
+    /**
      * Initialize the extension
      */
     function init() {
@@ -854,10 +1011,24 @@
         if (window.eventSource) {
             eventSource.on('MESSAGE_SENT', () => {
                 console.log('[Sprite Council] User message sent');
+
+                // In Chair Mode, we manually trigger generation for the correct character
+                if (spriteCouncilSettings.enabled && spriteCouncilSettings.chair_mode && spriteCouncilSettings.chair_sprite) {
+                    setTimeout(() => {
+                        handleChairModeGeneration();
+                    }, 100); // Small delay to ensure message is fully processed
+                }
             });
 
             eventSource.on('GENERATION_ENDED', () => {
                 console.log('[Sprite Council] Generation ended');
+
+                // In Chair Mode, check if we need to trigger the next speaker
+                if (spriteCouncilSettings.enabled && spriteCouncilSettings.chair_mode && spriteCouncilSettings.chair_sprite) {
+                    setTimeout(() => {
+                        handleChairModeAfterGeneration();
+                    }, 100); // Small delay to ensure generation is fully processed
+                }
             });
 
             // Update dropdowns when group chat changes
