@@ -223,6 +223,39 @@
     }
 
     /**
+     * Update the "add character" dropdown with available group members
+     */
+    function updateAddCharacterDropdown() {
+        const dropdown = $('#sprite-council-new-sprite-select');
+        dropdown.empty();
+        dropdown.append('<option value="">Select a character to add...</option>');
+
+        const groupMembers = getGroupMemberNames();
+        if (groupMembers && groupMembers.length > 0) {
+            for (const memberName of groupMembers) {
+                const isConfigured = spriteCouncilSettings.sprite_domains[memberName] !== undefined;
+                if (!isConfigured) {
+                    dropdown.append(`<option value="${memberName}">${memberName}</option>`);
+                }
+            }
+
+            // Add a separator and show configured characters
+            const configured = groupMembers.filter(name =>
+                spriteCouncilSettings.sprite_domains[name] !== undefined
+            );
+            if (configured.length > 0) {
+                dropdown.append('<option disabled>──────────</option>');
+                dropdown.append('<option disabled>Already configured:</option>');
+                configured.forEach(name => {
+                    dropdown.append(`<option disabled>  ${name} ✓</option>`);
+                });
+            }
+        } else {
+            dropdown.append('<option disabled>No group chat active</option>');
+        }
+    }
+
+    /**
      * Render the sprite domains UI
      */
     function renderSpriteDomainsUI() {
@@ -232,33 +265,38 @@
         const sprites = Object.keys(spriteCouncilSettings.sprite_domains);
 
         if (sprites.length === 0) {
-            container.append('<div class="sprite-domain-empty">No sprites configured yet. Add a sprite below.</div>');
+            container.append('<div class="sprite-domain-empty">No characters configured yet. Select one below.</div>');
+            updateAddCharacterDropdown();
             return;
         }
 
         for (const spriteName of sprites) {
             const keywords = spriteCouncilSettings.sprite_domains[spriteName] || [];
             const keywordText = keywords.join(', ');
+            const keywordCount = keywords.length;
 
             const spriteHtml = `
                 <div class="sprite-domain-item" data-sprite="${spriteName}">
                     <div class="sprite-domain-header">
                         <strong>${spriteName}</strong>
+                        <span class="sprite-keyword-count">${keywordCount} keywords</span>
+                        <button class="sprite-domain-refresh menu_button" data-sprite="${spriteName}" title="Refresh keywords from lorebook">🔄</button>
                         <button class="sprite-domain-delete menu_button" data-sprite="${spriteName}">Delete</button>
                     </div>
                     <div class="sprite-domain-keywords">
                         <input type="text" class="text_pole sprite-domain-keywords-input"
                                data-sprite="${spriteName}"
                                value="${keywordText}"
-                               placeholder="Enter keywords separated by commas">
+                               placeholder="Enter keywords separated by commas (or refresh from lorebook)">
                     </div>
                 </div>
             `;
             container.append(spriteHtml);
         }
 
-        // Update chair sprite dropdown
+        // Update dropdowns
         updateChairSpriteDropdown();
+        updateAddCharacterDropdown();
     }
 
     /**
@@ -305,24 +343,80 @@
      * Add a new sprite
      */
     function addSprite() {
-        const nameInput = $('#sprite-council-new-sprite-name');
-        const spriteName = nameInput.val().trim();
+        const dropdown = $('#sprite-council-new-sprite-select');
+        const spriteName = dropdown.val();
 
         if (!spriteName) {
-            toastr.warning('Please enter a sprite name');
+            toastr.warning('Please select a character');
             return;
         }
 
         if (spriteCouncilSettings.sprite_domains[spriteName]) {
-            toastr.warning('A sprite with this name already exists');
+            toastr.warning('This character is already configured');
             return;
         }
 
-        spriteCouncilSettings.sprite_domains[spriteName] = [];
-        nameInput.val('');
+        // Try to auto-populate keywords from lorebook
+        const keywords = extractKeywordsFromLorebook(spriteName);
+
+        spriteCouncilSettings.sprite_domains[spriteName] = keywords;
+        dropdown.val('');
         saveSettings();
         renderSpriteDomainsUI();
-        toastr.success(`Added sprite: ${spriteName}`);
+
+        const keywordInfo = keywords.length > 0
+            ? ` with ${keywords.length} keywords from lorebook`
+            : ' (no lorebook keywords found - add manually)';
+        toastr.success(`Added ${spriteName}${keywordInfo}`);
+    }
+
+    /**
+     * Extract keywords from a character's lorebook
+     */
+    function extractKeywordsFromLorebook(characterName) {
+        try {
+            const context = SillyTavern.getContext();
+
+            // Find the character
+            const character = context.characters.find(c => c.name === characterName);
+            if (!character) {
+                console.log(`[Sprite Council] Character ${characterName} not found`);
+                return [];
+            }
+
+            const keywords = new Set();
+
+            // Check character lorebook (character_book)
+            if (character.data && character.data.character_book) {
+                const book = character.data.character_book;
+                if (book.entries) {
+                    for (const entry of book.entries) {
+                        // Extract from keys (most common place for keywords)
+                        if (entry.keys && Array.isArray(entry.keys)) {
+                            entry.keys.forEach(key => {
+                                const cleaned = key.trim().toLowerCase();
+                                if (cleaned) keywords.add(cleaned);
+                            });
+                        }
+
+                        // Also try secondary_keys if they exist
+                        if (entry.secondary_keys && Array.isArray(entry.secondary_keys)) {
+                            entry.secondary_keys.forEach(key => {
+                                const cleaned = key.trim().toLowerCase();
+                                if (cleaned) keywords.add(cleaned);
+                            });
+                        }
+                    }
+                }
+            }
+
+            const result = Array.from(keywords);
+            console.log(`[Sprite Council] Extracted ${result.length} keywords for ${characterName}:`, result);
+            return result;
+        } catch (error) {
+            console.error('[Sprite Council] Error extracting lorebook keywords:', error);
+            return [];
+        }
     }
 
     /**
@@ -354,6 +448,55 @@
 
         spriteCouncilSettings.sprite_domains[spriteName] = keywords;
         saveSettings();
+    }
+
+    /**
+     * Refresh a single character's keywords from their lorebook
+     */
+    function refreshCharacterKeywords(spriteName) {
+        const keywords = extractKeywordsFromLorebook(spriteName);
+
+        if (keywords.length > 0) {
+            spriteCouncilSettings.sprite_domains[spriteName] = keywords;
+            saveSettings();
+            renderSpriteDomainsUI();
+            toastr.success(`Refreshed ${spriteName}: ${keywords.length} keywords from lorebook`);
+        } else {
+            toastr.warning(`No lorebook keywords found for ${spriteName}`);
+        }
+    }
+
+    /**
+     * Refresh all configured characters' keywords from lorebooks
+     */
+    function refreshAllKeywords() {
+        const sprites = Object.keys(spriteCouncilSettings.sprite_domains);
+
+        if (sprites.length === 0) {
+            toastr.info('No characters configured yet');
+            return;
+        }
+
+        let updated = 0;
+        let totalKeywords = 0;
+
+        for (const spriteName of sprites) {
+            const keywords = extractKeywordsFromLorebook(spriteName);
+            if (keywords.length > 0) {
+                spriteCouncilSettings.sprite_domains[spriteName] = keywords;
+                updated++;
+                totalKeywords += keywords.length;
+            }
+        }
+
+        saveSettings();
+        renderSpriteDomainsUI();
+
+        if (updated > 0) {
+            toastr.success(`Refreshed ${updated} character(s): ${totalKeywords} total keywords from lorebooks`);
+        } else {
+            toastr.warning('No lorebook keywords found for any configured characters');
+        }
     }
 
     /**
@@ -425,11 +568,14 @@
                             </div>
 
                             <div class="sprite-domain-add">
-                                <input type="text" id="sprite-council-new-sprite-name"
-                                       class="text_pole"
-                                       placeholder="New sprite name">
+                                <select id="sprite-council-new-sprite-select" class="text_pole">
+                                    <option value="">Select a character to add...</option>
+                                </select>
                                 <button id="sprite-council-add-sprite" class="menu_button">
-                                    Add Sprite
+                                    Add Character
+                                </button>
+                                <button id="sprite-council-refresh-lorebook" class="menu_button" title="Refresh keywords from lorebook for all configured characters">
+                                    🔄 Refresh All
                                 </button>
                             </div>
                         </div>
@@ -493,10 +639,16 @@
 
         // Add Sprite
         $('#sprite-council-add-sprite').on('click', addSprite);
-        $('#sprite-council-new-sprite-name').on('keypress', function(e) {
-            if (e.which === 13) { // Enter key
-                addSprite();
-            }
+
+        // Refresh single character's keywords from lorebook
+        $(document).on('click', '.sprite-domain-refresh', function() {
+            const spriteName = $(this).data('sprite');
+            refreshCharacterKeywords(spriteName);
+        });
+
+        // Refresh all characters' keywords from lorebook
+        $('#sprite-council-refresh-lorebook').on('click', function() {
+            refreshAllKeywords();
         });
 
         // Delete Sprite (delegated event)
@@ -598,23 +750,26 @@
                 console.log('[Sprite Council] Generation ended');
             });
 
-            // Update chair dropdown when group chat changes
+            // Update dropdowns when group chat changes
             eventSource.on('CHAT_CHANGED', () => {
-                console.log('[Sprite Council] Chat changed - updating chair dropdown');
+                console.log('[Sprite Council] Chat changed - updating dropdowns');
                 updateChairSpriteDropdown();
+                updateAddCharacterDropdown();
             });
 
             // Also update when characters are added/removed from group
             eventSource.on('GROUP_UPDATED', () => {
-                console.log('[Sprite Council] Group updated - updating chair dropdown');
+                console.log('[Sprite Council] Group updated - updating dropdowns');
                 updateChairSpriteDropdown();
+                updateAddCharacterDropdown();
             });
         }
 
-        // Update dropdown when settings panel is opened
+        // Update dropdowns when settings panel is opened
         $(document).on('click', '#sprite-council-settings .inline-drawer-toggle', function() {
             setTimeout(() => {
                 updateChairSpriteDropdown();
+                updateAddCharacterDropdown();
             }, 100);
         });
 

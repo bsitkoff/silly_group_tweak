@@ -57,6 +57,25 @@
     color: var(--SmartThemeBodyColor);
 }
 
+.sprite-keyword-count {
+    font-size: 0.85em;
+    color: var(--SmartThemeQuoteColor);
+    margin-left: 10px;
+    font-style: italic;
+}
+
+.sprite-domain-refresh {
+    background-color: var(--SmartThemeBlurTintColor);
+    padding: 4px 10px;
+    font-size: 0.9em;
+    margin-left: auto;
+    margin-right: 5px;
+}
+
+.sprite-domain-refresh:hover {
+    background-color: var(--SmartThemeBorderColor);
+}
+
 .sprite-domain-delete {
     background-color: var(--crimson70a);
     padding: 4px 10px;
@@ -91,12 +110,20 @@
     margin-top: 10px;
 }
 
-.sprite-domain-add input {
+.sprite-domain-add select {
     flex: 1;
 }
 
 .sprite-domain-add button {
     flex-shrink: 0;
+}
+
+#sprite-council-refresh-lorebook {
+    background-color: var(--SmartThemeBlurTintColor);
+}
+
+#sprite-council-refresh-lorebook:hover {
+    background-color: var(--SmartThemeBorderColor);
 }
 
 /* Slider styling */

@@ -5,7 +5,13 @@ Acts as a "DM" (Dungeon Master) for group chats, intelligently routing user mess
 ## Features
 
 ### 🎯 Smart Character Routing
-Routes user messages to characters based on keyword domains. Each character has areas of expertise (keywords you configure), and the extension matches user messages against these domains to select the most relevant respondents.
+Routes user messages to characters based on keyword domains. Keywords are **automatically extracted from character lorebooks** - no manual configuration needed! The extension matches user messages against these domains to select the most relevant respondents.
+
+### 📚 Lorebook Integration
+- **Auto-extracts keywords** from each character's lorebook entries
+- **One-click refresh** to sync keywords when lorebooks change
+- **Manual override** available if you want to customize keywords
+- Works with character-specific lorebooks (character_book)
 
 ### 👥 Max Speakers Control
 Limits how many characters respond to each user message (default: 2). Prevents overwhelming conversations and keeps discussions focused.
@@ -18,6 +24,11 @@ Optionally designate a "chair" or default character who:
 - Responds when their keywords match
 - Acts as fallback when no other character has strong keyword matches
 - Provides a consistent grounding voice in conversations
+
+### 🔄 Dynamic Group Detection
+- **Add characters from dropdown** showing current group members
+- **Chair selection from dropdown** of actual characters in the group
+- **Auto-updates** when you switch groups or change membership
 
 ## How It Works
 
@@ -50,12 +61,16 @@ No hardcoded character names - you configure everything through the UI:
 
 ### Setting Up Your Characters
 
-1. **Add a character**: Type the character name (must match exactly) and click "Add Sprite"
-2. **Add keywords**: Enter comma-separated keywords that should trigger this character
-3. **Set chair character** (optional): The dropdown shows all characters in your current group chat. Characters with a ✓ have keywords configured. Select which character should be the default/fallback.
-4. **Adjust settings**: Use the sliders and toggles to fine-tune behavior
+1. **Add a character**: Select from the dropdown of your current group members and click "Add Character"
+   - Keywords are **automatically extracted from the character's lorebook** if available
+   - If no lorebook entries exist, you can add keywords manually
+2. **Refresh keywords**: Click the 🔄 button next to any character to re-sync keywords from their lorebook
+   - Or use "🔄 Refresh All" to update all characters at once
+3. **Edit keywords manually**: Type in the keyword field if you want to customize or add keywords beyond the lorebook
+4. **Set chair character** (optional): The dropdown shows all characters in your current group chat. Characters with a ✓ have keywords configured. Select which character should be the default/fallback.
+5. **Adjust settings**: Use the sliders and toggles to fine-tune behavior
 
-**Note:** The chair character dropdown automatically updates when you switch group chats, so you can easily select from whoever is in your current group.
+**Note:** Both dropdowns automatically update when you switch group chats, so you can easily work with whoever is in your current group.
 
 ## Installation
 
@@ -100,10 +115,16 @@ With **Alice** as the chair character and **max_speakers: 2**:
 
 Use the settings UI - no code editing required:
 
-1. Type your character's exact name in the "New sprite name" field (must match the character name in SillyTavern)
-2. Click "Add Sprite"
-3. Enter keywords separated by commas
-4. Keywords save automatically after you stop typing
+1. Select a character from the dropdown (shows current group members)
+2. Click "Add Character"
+3. Keywords are automatically extracted from the character's lorebook
+4. Manually edit keywords if needed - changes save automatically after you stop typing
+
+### Syncing Lorebook Changes
+
+If you update a character's lorebook:
+1. Click the 🔄 button next to that character to refresh their keywords
+2. Or click "🔄 Refresh All" to update all configured characters at once
 
 ### Changing Chair Character
 
