@@ -1,56 +1,59 @@
 # Sprite Council - SillyTavern Extension
 
-Acts as a "DM" (Dungeon Master) for sprite group chats, intelligently routing user messages to the most relevant characters.
+Acts as a "DM" (Dungeon Master) for group chats, intelligently routing user messages to the most relevant characters based on keyword matching.
 
 ## Features
 
-### 🎯 Smart Sprite Routing
-Routes user messages to sprites based on keyword domains. Each sprite has areas of expertise, and the extension matches user messages against these domains to select the most relevant respondents.
+### 🎯 Smart Character Routing
+Routes user messages to characters based on keyword domains. Each character has areas of expertise (keywords you configure), and the extension matches user messages against these domains to select the most relevant respondents.
 
 ### 👥 Max Speakers Control
-Limits how many sprites respond to each user message (default: 2). Prevents overwhelming conversations and keeps discussions focused.
+Limits how many characters respond to each user message (default: 2). Prevents overwhelming conversations and keeps discussions focused.
 
 ### 📝 Brevity Enforcement
-Automatically injects instructions to keep sprite responses concise (3-5 sentences by default), unless the user asks for more detail.
+Automatically injects instructions to keep character responses concise (3-5 sentences by default), unless the user asks for more detail.
 
-### 🪑 Chair Sprite (Default: Pip)
-Always includes a designated "chair" sprite when:
-- Keywords match their domain (plan, schedule, time, task, overwhelmed)
-- No other sprite has a strong keyword match
-- Acts as a grounding voice and default facilitator
+### 🪑 Chair Character (Optional)
+Optionally designate a "chair" or default character who:
+- Responds when their keywords match
+- Acts as fallback when no other character has strong keyword matches
+- Provides a consistent grounding voice in conversations
 
 ## How It Works
 
 1. **User sends a message** in a group chat
-2. **Extension analyzes** the message against sprite domain keywords
-3. **Selects top N sprites** (respecting max_speakers limit)
+2. **Extension analyzes** the message against character keyword domains
+3. **Selects top N characters** (respecting max_speakers limit)
 4. **Injects mentions** to trigger Natural Order selection in SillyTavern
 5. **Adds brevity instructions** to keep responses concise
 
 ## Configuration
 
-Default sprite domains (edit in `index.js`):
+**All configuration is done through the SillyTavern Extensions settings panel!**
 
-```javascript
-sprite_domains: {
-    "Pip": ["plan", "schedule", "time", "task", "overwhelmed", "organize", "manage"],
-    "Saffron": ["food", "dinner", "meal", "hungry", "cooking", "recipe", "eat"],
-    "Echo": ["feelings", "sad", "anxious", "emotion", "feel", "afraid", "worried"],
-    "Knot": ["info", "research", "explain", "study", "learn", "understand", "how"],
-    "Quorum": ["decide", "choice", "pick", "choose", "decision", "should"]
-}
-```
+No hardcoded character names - you configure everything through the UI:
 
-### Adjustable Settings
+1. Open SillyTavern
+2. Go to **Extensions** (puzzle piece icon)
+3. Find **Sprite Council** in the extensions list
+4. Click to expand the settings panel
 
-In `index.js`, modify the `spriteCouncilSettings` object:
+### Available Settings
 
-- **enabled** (true/false): Turn extension on/off
-- **max_speakers** (number): Maximum sprites per user message (default: 2)
-- **brevity_enabled** (true/false): Enable/disable brevity enforcement
-- **brevity_instruction** (string): Custom instruction for keeping responses short
-- **chair_sprite** (string): Name of the default "chair" sprite (default: "Pip")
-- **sprite_domains** (object): Keyword mappings for each sprite
+- **Enable Extension**: Turn the extension on/off
+- **Max Speakers**: How many characters can respond per message (1-5, default: 2)
+- **Chair Character**: Select a default/fallback character from your configured characters (optional)
+- **Brevity Enforcement**: Toggle concise responses on/off
+- **Brevity Instruction**: Customize the instruction for keeping responses brief
+- **Character Domains**: Add/edit/delete characters and their keyword triggers
+- **Import/Export**: Save and share your configuration as JSON
+
+### Setting Up Your Characters
+
+1. **Add a character**: Type the character name (must match exactly) and click "Add Sprite"
+2. **Add keywords**: Enter comma-separated keywords that should trigger this character
+3. **Set chair character** (optional): Select which character should be the default from the dropdown
+4. **Adjust settings**: Use the sliders and toggles to fine-tune behavior
 
 ## Installation
 
@@ -70,58 +73,59 @@ Just chat normally in a group chat! The extension automatically:
 - Limits responses to your configured max_speakers
 - Keeps responses brief
 
-### Example Routing
+### Example Configuration & Routing
+
+Let's say you configure these characters (example only - use your own character names):
+
+- **Alice**: plan, schedule, time, task, overwhelmed
+- **Bob**: food, dinner, meal, hungry, cooking
+- **Carol**: feelings, sad, anxious, emotion, feel
+
+With **Alice** as the chair character and **max_speakers: 2**:
 
 **User:** "I'm feeling overwhelmed with all these tasks"
-- **Selects:** Pip (overwhelmed + task keywords) + Echo (feelings keyword)
+- **Selects:** Alice (overwhelmed + task) + Carol (feelings)
 
 **User:** "What should we have for dinner?"
-- **Selects:** Saffron (food + dinner keywords) + Quorum (should keyword)
-
-**User:** "Can you explain how photosynthesis works?"
-- **Selects:** Knot (explain + how keywords) + Pip (chair fallback)
+- **Selects:** Bob (food + dinner) + Alice (chair fallback)
 
 **User:** "Just saying hi!"
-- **Selects:** Pip (no strong matches, chair sprite always responds)
+- **Selects:** Alice (no matches, chair character responds)
 
 ## Customization
 
-### Adding New Sprites
+### Adding New Characters
 
-Edit the `sprite_domains` object in `index.js`:
+Use the settings UI - no code editing required:
 
-```javascript
-sprite_domains: {
-    "YourSpriteName": ["keyword1", "keyword2", "keyword3"],
-    // ... existing sprites
-}
-```
+1. Type your character's exact name in the "New sprite name" field (must match the character name in SillyTavern)
+2. Click "Add Sprite"
+3. Enter keywords separated by commas
+4. Keywords save automatically after you stop typing
 
-### Changing Chair Sprite
+### Changing Chair Character
 
-Modify the `chair_sprite` setting:
-
-```javascript
-chair_sprite: "YourPreferredSprite"
-```
+Use the "Chair Sprite" dropdown in settings to select from your configured characters, or leave it as "None" for purely score-based selection.
 
 ### Adjusting Brevity Instructions
 
-Customize the brevity message:
+Edit the "Brevity Instruction" textarea in settings. Changes save automatically.
 
-```javascript
-brevity_instruction: "Keep your response under 4 sentences and be playful about it."
-```
+### Import/Export Settings
+
+- **Export**: Click "Export Settings" to save your configuration as JSON
+- **Import**: Click "Import Settings" to load a previously saved configuration
+- Share configurations with others or backup your settings!
 
 ## Technical Details
 
-### How Sprite Selection Works
+### How Character Selection Works
 
 1. **Keyword Matching**: Uses whole-word regex matching against message text
-2. **Scoring**: Each keyword match = +1 point for that sprite
-3. **Ranking**: Sprites sorted by score (highest first)
-4. **Chair Priority**: Chair sprite included if they match keywords OR no other sprite scores points
-5. **Selection**: Top N sprites selected (up to max_speakers)
+2. **Scoring**: Each keyword match = +1 point for that character
+3. **Ranking**: Characters sorted by score (highest first)
+4. **Chair Priority**: Chair character included if they match keywords OR no other character scores points
+5. **Selection**: Top N characters selected (up to max_speakers)
 
 ### Integration with SillyTavern
 
@@ -132,29 +136,30 @@ brevity_instruction: "Keep your response under 4 sentences and be playful about 
 
 ## Troubleshooting
 
-**Sprites not responding:**
+**Characters not responding:**
 - Make sure you're in a group chat
-- Check that sprite names in config exactly match character names
+- Check that character names in extension settings exactly match your SillyTavern character names (case-sensitive!)
 - Verify the extension is enabled in settings
 
-**Too many/few sprites responding:**
+**Too many/few characters responding:**
 - Adjust `max_speakers` setting
-- Check keyword matches in console log
+- Check keyword matches in browser console log (F12)
 
 **Responses too long:**
 - Verify `brevity_enabled` is true
 - Customize `brevity_instruction` to be more specific
 
-**Chair sprite not working:**
-- Ensure `chair_sprite` name matches exactly
-- Check that character exists in the group
+**Chair character not working:**
+- Ensure chair character name matches exactly
+- Check that character exists in the group chat
 
 ## Debug Mode
 
 Check browser console (F12) for debug output:
-- Selected sprites for each message
+- Selected characters for each message
 - Keyword match scores
 - Interceptor execution logs
+- Settings load/save confirmations
 
 ## Requirements
 
@@ -165,12 +170,12 @@ Check browser console (F12) for debug output:
 ## Future Enhancements
 
 Potential features for future versions:
-- Settings UI panel
 - Per-character response length limits
-- Conversation history awareness
-- Dynamic domain learning
+- Conversation history awareness (don't re-select same character multiple times in a row)
+- Dynamic domain learning based on character responses
 - Multi-turn conversation threading
-- Priority weighting for keywords
+- Priority/weight system for keywords (some keywords more important than others)
+- Auto-detect character names from current group
 
 ## License
 
@@ -178,6 +183,13 @@ MIT License - Feel free to modify and share!
 
 ## Credits
 
-Created for managing sprite councils and keeping group chat conversations focused and relevant.
+Originally created for managing sprite councils, but works with any group chat characters!
+
+Perfect for:
+- Multi-character roleplay
+- Virtual assistant teams
+- Story writing collaborations
+- Expert panels
+- Any scenario where you want smart character selection instead of chaos
 
 *taps tiny pocket watch* ✨

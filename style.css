@@ -1,22 +1,117 @@
 /**
  * Sprite Council Extension Styles
- * Currently no custom UI elements, but placeholder for future settings panel
  */
 
-.sprite-council-settings {
-    padding: 10px;
+#sprite-council-settings {
     margin: 10px 0;
+}
+
+.sprite-council-setting {
+    margin-bottom: 15px;
+    padding: 10px;
     background-color: var(--SmartThemeBlurTintColor);
     border-radius: 5px;
 }
 
-.sprite-council-settings label {
-    display: block;
-    margin-bottom: 5px;
+.sprite-council-setting h3 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    color: var(--SmartThemeBodyColor);
 }
 
-.sprite-council-settings input,
-.sprite-council-settings textarea {
-    width: 100%;
+.sprite-council-setting label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.sprite-council-setting small {
+    display: block;
+    margin-top: 5px;
+    color: var(--SmartThemeQuoteColor);
+    font-style: italic;
+}
+
+/* Sprite Domains List */
+.sprite-domains-container {
+    margin: 10px 0;
+}
+
+.sprite-domain-item {
+    background-color: var(--black30a);
+    padding: 10px;
     margin-bottom: 10px;
+    border-radius: 5px;
+    border: 1px solid var(--SmartThemeBorderColor);
+}
+
+.sprite-domain-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.sprite-domain-header strong {
+    font-size: 1.1em;
+    color: var(--SmartThemeBodyColor);
+}
+
+.sprite-domain-delete {
+    background-color: var(--crimson70a);
+    padding: 4px 10px;
+    font-size: 0.9em;
+}
+
+.sprite-domain-delete:hover {
+    background-color: var(--crimson);
+}
+
+.sprite-domain-keywords {
+    margin-top: 8px;
+}
+
+.sprite-domain-keywords-input {
+    width: 100%;
+    font-family: monospace;
+    font-size: 0.95em;
+}
+
+.sprite-domain-empty {
+    padding: 20px;
+    text-align: center;
+    color: var(--SmartThemeQuoteColor);
+    font-style: italic;
+}
+
+/* Add Sprite Section */
+.sprite-domain-add {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.sprite-domain-add input {
+    flex: 1;
+}
+
+.sprite-domain-add button {
+    flex-shrink: 0;
+}
+
+/* Slider styling */
+#sprite-council-max-speakers {
+    width: 100%;
+    margin-top: 5px;
+}
+
+#sprite-council-max-speakers-value {
+    font-weight: bold;
+    color: var(--SmartThemeBodyColor);
+}
+
+/* Export/Import buttons */
+#sprite-council-settings .sprite-council-setting button {
+    margin-right: 10px;
+    margin-top: 5px;
 }
