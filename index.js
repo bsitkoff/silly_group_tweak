@@ -10,6 +10,7 @@
     // Extension settings with defaults (no hardcoded sprites)
     const defaultSettings = {
         enabled: true,
+        chair_mode: false,  // NEW: Enable chair-controlled turn-taking
         max_speakers: 2,
         brevity_enabled: true,
         brevity_instruction: "Reply in 3-5 sentences max unless the user specifically asks for more detail.",
@@ -43,7 +44,51 @@
     }
 
     /**
-     * Select which sprites should respond to the message
+     * Detect if the chair is calling on a specific sprite in their message
+     * Returns the sprite name if found, null otherwise
+     */
+    function detectCalledSprite(chairMessage, groupMembers) {
+        if (!chairMessage) return null;
+
+        const lowerMessage = chairMessage.toLowerCase();
+
+        // Patterns for calling on someone:
+        // "I call on X", "X, your turn", "let's hear from X", "X?", etc.
+        for (const member of groupMembers) {
+            const lowerName = member.toLowerCase();
+
+            // Direct patterns
+            const patterns = [
+                `i call on ${lowerName}`,
+                `calling on ${lowerName}`,
+                `i hereby call on ${lowerName}`,
+                `${lowerName}, your turn`,
+                `${lowerName}'s turn`,
+                `over to ${lowerName}`,
+                `let's hear from ${lowerName}`,
+                `${lowerName}, what`,
+                `${lowerName}, can you`,
+                `${lowerName}, could you`,
+                `${lowerName} only`,
+                `just ${lowerName}`,
+                `${lowerName} to say`,
+                `${lowerName} to respond`
+            ];
+
+            for (const pattern of patterns) {
+                if (lowerMessage.includes(pattern)) {
+                    console.log(`[Sprite Council] Chair called on: ${member} (pattern: "${pattern}")`);
+                    return member;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Select which sprites should respond to the message (keyword-based mode)
+     * This is used when chair mode is disabled
      */
     function selectSprites(messageText, groupMembers) {
         const chairSprite = spriteCouncilSettings.chair_sprite;
@@ -134,61 +179,110 @@
                 return;
             }
 
-            // Find the last user message
-            let lastUserMsg = null;
-            for (let i = chat.length - 1; i >= 0; i--) {
-                if (chat[i].is_user) {
-                    lastUserMsg = chat[i];
-                    break;
+            const chairSprite = spriteCouncilSettings.chair_sprite;
+            let selectedSprites = [];
+
+            // CHAIR MODE: Turn-based control where only chair or called-on sprite speaks
+            if (spriteCouncilSettings.chair_mode && chairSprite) {
+                console.log('[Sprite Council] Chair mode active, chair:', chairSprite);
+
+                // Find the last message (user or character)
+                let lastMessage = null;
+                let lastMessageIndex = -1;
+                for (let i = chat.length - 1; i >= 0; i--) {
+                    if (chat[i].mes && !chat[i].is_system) {
+                        lastMessage = chat[i];
+                        lastMessageIndex = i;
+                        break;
+                    }
+                }
+
+                if (!lastMessage) {
+                    // No messages yet, default to chair
+                    selectedSprites = [chairSprite];
+                } else if (lastMessage.is_user) {
+                    // User just spoke → only chair should respond
+                    selectedSprites = [chairSprite];
+                    console.log('[Sprite Council] Last message from user → selecting chair only');
+                } else {
+                    // Last message from a character
+                    const lastSpeaker = lastMessage.name;
+
+                    if (lastSpeaker === chairSprite) {
+                        // Chair just spoke → check if they called on someone
+                        const calledSprite = detectCalledSprite(lastMessage.mes, groupMembers);
+                        if (calledSprite) {
+                            selectedSprites = [calledSprite];
+                            console.log(`[Sprite Council] Chair called on ${calledSprite} → selecting them only`);
+                        } else {
+                            // Chair spoke but didn't call anyone → chair continues
+                            selectedSprites = [chairSprite];
+                            console.log('[Sprite Council] Chair spoke but called no one → chair continues');
+                        }
+                    } else {
+                        // Someone other than chair spoke → yield back to chair
+                        selectedSprites = [chairSprite];
+                        console.log(`[Sprite Council] ${lastSpeaker} spoke → yielding back to chair`);
+                    }
                 }
             }
-
-            if (!lastUserMsg) {
-                return; // No user message found
-            }
-
-            // Check if this is a new user message or if we're already processing
-            const messageContent = lastUserMsg.mes || "";
-
-            if (messageContent !== lastUserMessage) {
-                // New user message - select sprites
-                lastUserMessage = messageContent;
-                isProcessingGroup = true;
-
-                const selectedSprites = selectSprites(messageContent, groupMembers);
-
-                // Inject mentions into the message to trigger Natural Order
-                // We'll add them as a hidden HTML comment so they don't display
-                // but the mention system will still detect them
-                const mentionText = selectedSprites.join(' ');
-                if (!lastUserMsg.mes.includes('<!-- sprite-council-mentions:')) {
-                    lastUserMsg.mes += `\n<!-- sprite-council-mentions: ${mentionText} -->`;
-                    // Also add as plain text mentions at the end
-                    lastUserMsg.mes += `\n\n[To: ${mentionText}]`;
+            // KEYWORD MODE: Original behavior - select based on keywords
+            else {
+                // Find the last user message
+                let lastUserMsg = null;
+                for (let i = chat.length - 1; i >= 0; i--) {
+                    if (chat[i].is_user) {
+                        lastUserMsg = chat[i];
+                        break;
+                    }
                 }
+
+                if (!lastUserMsg) {
+                    return; // No user message found
+                }
+
+                const messageContent = lastUserMsg.mes || "";
+                selectedSprites = selectSprites(messageContent, groupMembers);
+                console.log('[Sprite Council] Keyword mode: selected', selectedSprites.join(', '));
             }
 
-            // Inject brevity instruction into the system prompt
-            if (spriteCouncilSettings.brevity_enabled) {
-                // Add brevity instruction to the last message in chat as a system note
-                const brevityNote = {
+            // Inject speaker restriction by adding a system message
+            // This tells Natural Order who should speak
+            if (selectedSprites.length > 0) {
+                // Remove any previous sprite-council-instruction messages
+                for (let i = chat.length - 1; i >= 0; i--) {
+                    if (chat[i].is_system && chat[i].mes && chat[i].mes.includes('<!-- sprite-council-instruction -->')) {
+                        chat.splice(i, 1);
+                    }
+                }
+
+                // Add instruction for who should speak
+                const speakerList = selectedSprites.join(', ');
+                const instructionMessage = {
                     name: 'System',
                     is_system: true,
                     is_user: false,
-                    mes: spriteCouncilSettings.brevity_instruction,
+                    mes: `<!-- sprite-council-instruction -->\nONLY the following character(s) should respond to this message: ${speakerList}. All other characters must remain silent and not respond.`
                 };
+                chat.push(instructionMessage);
+                console.log(`[Sprite Council] Restricted speakers to: ${speakerList}`);
+            }
 
-                // Check if we already added this
+            // Inject brevity instruction
+            if (spriteCouncilSettings.brevity_enabled) {
                 const hasBrevityNote = chat.some(msg =>
-                    msg.mes === spriteCouncilSettings.brevity_instruction
+                    msg.is_system && msg.mes === spriteCouncilSettings.brevity_instruction
                 );
 
                 if (!hasBrevityNote) {
-                    chat.push(brevityNote);
+                    chat.push({
+                        name: 'System',
+                        is_system: true,
+                        is_user: false,
+                        mes: spriteCouncilSettings.brevity_instruction
+                    });
                 }
             }
-
-            console.log('[Sprite Council] Intercepted generation for group chat');
 
         } catch (error) {
             console.error('[Sprite Council] Error in interceptor:', error);
@@ -521,6 +615,24 @@
                             <small>Turn the Sprite Council on or off</small>
                         </div>
 
+                        <!-- Chair Mode -->
+                        <div class="sprite-council-setting">
+                            <label for="sprite-council-chair-mode">
+                                <input type="checkbox" id="sprite-council-chair-mode" />
+                                Enable Chair Mode
+                            </label>
+                            <small>When enabled, only the chair responds to user messages, and can call on other sprites to speak. When disabled, uses keyword-based routing.</small>
+                        </div>
+
+                        <!-- Chair Sprite -->
+                        <div class="sprite-council-setting">
+                            <label for="sprite-council-chair-sprite">Chair Character</label>
+                            <select id="sprite-council-chair-sprite" class="text_pole">
+                                <option value="">None</option>
+                            </select>
+                            <small>In Chair Mode: this character controls the conversation and calls on others. In Keyword Mode: fallback character when no keywords match.</small>
+                        </div>
+
                         <!-- Max Speakers -->
                         <div class="sprite-council-setting">
                             <label for="sprite-council-max-speakers">
@@ -528,16 +640,7 @@
                             </label>
                             <input type="range" id="sprite-council-max-speakers"
                                    min="1" max="5" step="1" value="2" class="slider">
-                            <small>Maximum number of sprites that can respond to each user message</small>
-                        </div>
-
-                        <!-- Chair Sprite -->
-                        <div class="sprite-council-setting">
-                            <label for="sprite-council-chair-sprite">Chair Character (Default/Fallback)</label>
-                            <select id="sprite-council-chair-sprite" class="text_pole">
-                                <option value="">None (random selection)</option>
-                            </select>
-                            <small>Shows all characters in the current group. ✓ = has keywords configured. This character responds when no others match, or when their keywords match.</small>
+                            <small>Maximum number of sprites that can respond to each user message (Keyword Mode only)</small>
                         </div>
 
                         <!-- Brevity Settings -->
@@ -608,6 +711,12 @@
         // Enable/Disable
         $('#sprite-council-enabled').on('change', function() {
             spriteCouncilSettings.enabled = $(this).prop('checked');
+            saveSettings();
+        });
+
+        // Chair Mode
+        $('#sprite-council-chair-mode').on('change', function() {
+            spriteCouncilSettings.chair_mode = $(this).prop('checked');
             saveSettings();
         });
 
@@ -719,6 +828,7 @@
      */
     function loadSettingsToUI() {
         $('#sprite-council-enabled').prop('checked', spriteCouncilSettings.enabled);
+        $('#sprite-council-chair-mode').prop('checked', spriteCouncilSettings.chair_mode);
         $('#sprite-council-max-speakers').val(spriteCouncilSettings.max_speakers);
         $('#sprite-council-max-speakers-value').text(spriteCouncilSettings.max_speakers);
         $('#sprite-council-brevity-enabled').prop('checked', spriteCouncilSettings.brevity_enabled);

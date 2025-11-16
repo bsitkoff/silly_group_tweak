@@ -19,11 +19,19 @@ Limits how many characters respond to each user message (default: 2). Prevents o
 ### 📝 Brevity Enforcement
 Automatically injects instructions to keep character responses concise (3-5 sentences by default), unless the user asks for more detail.
 
-### 🪑 Chair Character (Optional)
-Optionally designate a "chair" or default character who:
-- Responds when their keywords match
-- Acts as fallback when no other character has strong keyword matches
-- Provides a consistent grounding voice in conversations
+### 🪑 Chair Mode (NEW!)
+Two modes of operation:
+
+**Chair Mode**: Turn-based conversation control where:
+- Only the chair character responds to user messages
+- Chair can explicitly call on other characters (e.g., "I call on Willow")
+- Called character responds, then control returns to chair
+- Perfect for structured meetings, facilitated discussions, or therapy-style sessions
+
+**Keyword Mode** (original behavior): Keyword-based routing where:
+- Characters are selected based on keyword matches in user messages
+- Chair character acts as fallback when no other matches
+- Multiple characters can respond per message (up to max_speakers)
 
 ### 🔄 Dynamic Group Detection
 - **Add characters from dropdown** showing current group members
@@ -32,10 +40,21 @@ Optionally designate a "chair" or default character who:
 
 ## How It Works
 
+### Chair Mode
+
+1. **User sends a message** in a group chat
+2. **Only the chair character responds** automatically
+3. **Chair calls on other characters** by name in their message (e.g., "I call on Willow", "Willow, your turn")
+4. **Extension detects the call-on** and allows only that character to respond next
+5. **Control returns to chair** after the called character responds
+6. **Brevity instructions** keep all responses concise
+
+### Keyword Mode (Original)
+
 1. **User sends a message** in a group chat
 2. **Extension analyzes** the message against character keyword domains
 3. **Selects top N characters** (respecting max_speakers limit)
-4. **Injects mentions** to trigger Natural Order selection in SillyTavern
+4. **Injects instructions** to limit speakers
 5. **Adds brevity instructions** to keep responses concise
 
 ## Configuration
@@ -52,11 +71,14 @@ No hardcoded character names - you configure everything through the UI:
 ### Available Settings
 
 - **Enable Extension**: Turn the extension on/off
-- **Max Speakers**: How many characters can respond per message (1-5, default: 2)
-- **Chair Character**: Select a default/fallback character from your configured characters (optional)
+- **Enable Chair Mode**: Switch between Chair Mode (turn-based control) and Keyword Mode (keyword-based routing)
+- **Chair Character**: Select the character who will control the conversation
+  - In Chair Mode: This character responds to user messages and calls on others
+  - In Keyword Mode: Acts as fallback when no keywords match
+- **Max Speakers**: How many characters can respond per message (Keyword Mode only, 1-5, default: 2)
 - **Brevity Enforcement**: Toggle concise responses on/off
 - **Brevity Instruction**: Customize the instruction for keeping responses brief
-- **Character Domains**: Add/edit/delete characters and their keyword triggers
+- **Character Domains**: Add/edit/delete characters and their keyword triggers (Keyword Mode only)
 - **Import/Export**: Save and share your configuration as JSON
 
 ### Setting Up Your Characters
@@ -84,11 +106,39 @@ No hardcoded character names - you configure everything through the UI:
 
 ## Usage
 
-### Basic Usage
-Just chat normally in a group chat! The extension automatically:
-- Selects relevant sprites based on your message
-- Limits responses to your configured max_speakers
-- Keeps responses brief
+### Using Chair Mode
+
+Perfect for structured conversations where one character facilitates:
+
+1. **Enable Chair Mode** in extension settings
+2. **Select a chair character** from the dropdown
+3. **User messages** → Only the chair responds
+4. **Chair calls on others** using phrases like:
+   - "I call on Willow"
+   - "Willow, your turn"
+   - "Let's hear from Sparks"
+   - "Sparks, what do you think?"
+5. **Called character responds** → Only they can speak
+6. **Control returns to chair** automatically after they respond
+
+**Example conversation:**
+```
+User: "Hello all. We are testing a new extension."
+Pip (chair): "Hey! I'll be chairing this session. Willow, can you share your thoughts?"
+Willow: "This is working well! The turn-taking feels natural."
+Pip (chair): "Thanks Willow. User, what would you like to discuss next?"
+```
+
+### Using Keyword Mode (Original Behavior)
+
+For more organic, keyword-driven conversations:
+
+1. **Disable Chair Mode** in extension settings
+2. **Configure character keywords** (auto-extracted from lorebooks)
+3. Just chat normally! The extension automatically:
+   - Selects relevant characters based on keywords in your message
+   - Limits responses to your configured max_speakers
+   - Keeps responses brief
 
 ### Example Configuration & Routing
 
