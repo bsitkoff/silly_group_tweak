@@ -24,6 +24,9 @@
     let lastUserMessage = "";
     let isProcessingGroup = false;
 
+    // Track when we're forcing a generation in Chair Mode (so we don't abort our own generations)
+    let isChairModeForcing = false;
+
     /**
      * Score a sprite based on keyword matches in the message
      */
@@ -254,13 +257,16 @@
             if (spriteCouncilSettings.chair_mode && chairSprite) {
                 console.log('[Sprite Council] Chair mode active, chair:', chairSprite);
 
-                // In Chair Mode, we handle generation via MESSAGE_SENT event
-                // The interceptor only adds brevity instruction
-                // Character selection is controlled by forced generation
-
-                // Abort auto-generation - we'll handle it manually
-                abort(true);
-                return;
+                // Don't abort if we're forcing a generation ourselves
+                if (isChairModeForcing) {
+                    console.log('[Sprite Council] Allowing forced generation to proceed');
+                    // Add brevity instruction but don't abort
+                } else {
+                    // Abort auto-generation - we'll handle it manually via MESSAGE_SENT
+                    console.log('[Sprite Council] Aborting auto-generation, will force manually');
+                    abort(true);
+                    return;
+                }
             }
             // KEYWORD MODE: Original behavior - select based on keywords
             else {
@@ -910,12 +916,20 @@
 
             console.log('[Sprite Council] Forcing generation for character ID:', chid);
 
+            // Set flag to allow our forced generation through the interceptor
+            isChairModeForcing = true;
+
             // Force generation for this specific character
             // Using the global Generate function with force_chid parameter
             if (typeof Generate === 'function') {
                 Generate('normal', { force_chid: chid });
+                // Clear flag after a short delay (generation is async)
+                setTimeout(() => {
+                    isChairModeForcing = false;
+                }, 500);
             } else {
                 console.error('[Sprite Council] Generate function not available');
+                isChairModeForcing = false;
             }
 
         } catch (error) {
@@ -976,11 +990,19 @@
                         return;
                     }
 
+                    // Set flag to allow our forced generation through the interceptor
+                    isChairModeForcing = true;
+
                     // Force generation for the called character
                     if (typeof Generate === 'function') {
                         Generate('normal', { force_chid: chid });
+                        // Clear flag after a short delay (generation is async)
+                        setTimeout(() => {
+                            isChairModeForcing = false;
+                        }, 500);
                     } else {
                         console.error('[Sprite Council] Generate function not available');
+                        isChairModeForcing = false;
                     }
                 }
                 // If chair didn't call on anyone, we don't auto-generate
