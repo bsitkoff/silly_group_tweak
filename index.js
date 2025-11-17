@@ -1036,17 +1036,38 @@
      * Register event listeners for Chair Mode and other features
      */
     function registerEventListeners() {
-        const eventSource = window.eventSource || window.SillyTavern?.eventSource;
-        if (!eventSource) {
+        // Try multiple ways to access the eventSource
+        // SillyTavern exposes eventSource as a global variable
+        let eventSourceObj;
+
+        // Check window.eventSource first
+        if (typeof window.eventSource !== 'undefined' && window.eventSource) {
+            eventSourceObj = window.eventSource;
+            console.log('[Sprite Council] Found event source via window.eventSource');
+        }
+        // Fallback to SillyTavern.eventSource (without window prefix - checking global)
+        else if (typeof SillyTavern !== 'undefined' && SillyTavern.eventSource) {
+            eventSourceObj = SillyTavern.eventSource;
+            console.log('[Sprite Council] Found event source via SillyTavern.eventSource');
+        }
+
+        if (!eventSourceObj) {
             console.error('[Sprite Council] eventSource not available, cannot register event listeners!');
+            console.error('[Sprite Council] Debug - typeof window.eventSource:', typeof window.eventSource);
+            console.error('[Sprite Council] Debug - window.eventSource value:', window.eventSource);
+            console.error('[Sprite Council] Debug - typeof SillyTavern:', typeof SillyTavern);
+            if (typeof SillyTavern !== 'undefined') {
+                console.error('[Sprite Council] Debug - typeof SillyTavern.eventSource:', typeof SillyTavern.eventSource);
+                console.error('[Sprite Council] Debug - SillyTavern.eventSource value:', SillyTavern.eventSource);
+            }
             return false;
         }
 
         console.log('[Sprite Council] Registering event listeners');
-        console.log('[Sprite Council] eventSource:', eventSource);
+        console.log('[Sprite Council] eventSource:', eventSourceObj);
 
         // Listen for message_sent event (when user sends a message)
-        eventSource.on('message_sent', () => {
+        eventSourceObj.on('message_sent', () => {
             console.log('[Sprite Council] message_sent event received');
 
             // In Chair Mode, we manually trigger generation for the correct character
@@ -1058,7 +1079,7 @@
         });
 
         // Listen for generation_ended event (when AI finishes generating)
-        eventSource.on('generation_ended', () => {
+        eventSourceObj.on('generation_ended', () => {
             console.log('[Sprite Council] generation_ended event received');
 
             // In Chair Mode, check if we need to trigger the next speaker
@@ -1070,14 +1091,14 @@
         });
 
         // Update dropdowns when group chat changes
-        eventSource.on('chat_changed', () => {
+        eventSourceObj.on('chat_changed', () => {
             console.log('[Sprite Council] Chat changed - updating dropdowns');
             updateChairSpriteDropdown();
             updateAddCharacterDropdown();
         });
 
         // Also update when characters are added/removed from group
-        eventSource.on('group_updated', () => {
+        eventSourceObj.on('group_updated', () => {
             console.log('[Sprite Council] Group updated - updating dropdowns');
             updateChairSpriteDropdown();
             updateAddCharacterDropdown();
