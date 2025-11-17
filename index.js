@@ -257,10 +257,17 @@
             if (spriteCouncilSettings.chair_mode && chairSprite) {
                 console.log('[Sprite Council] Chair mode active, chair:', chairSprite);
 
-                // Determine which character should speak and restrict to them only
+                // Chair can always speak. Determine if anyone else should also be allowed.
                 const nextSpeaker = getNextChairModeSpeaker(chat, groupMembers, chairSprite);
-                selectedSprites = [nextSpeaker];
-                console.log('[Sprite Council] Chair mode: restricting to speaker:', nextSpeaker);
+
+                if (nextSpeaker === chairSprite) {
+                    // Only chair should speak
+                    selectedSprites = [chairSprite];
+                } else {
+                    // Chair called on someone - both chair and called sprite can speak
+                    selectedSprites = [chairSprite, nextSpeaker];
+                }
+                console.log('[Sprite Council] Chair mode: allowed speakers:', selectedSprites.join(', '));
             }
             // KEYWORD MODE: Original behavior - select based on keywords
             else {
