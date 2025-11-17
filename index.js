@@ -268,17 +268,10 @@
             if (spriteCouncilSettings.chair_mode && chairSprite) {
                 console.log('[Sprite Council] Chair mode active, chair:', chairSprite);
 
-                // Chair can always speak. Determine if anyone else should also be allowed.
-                const nextSpeaker = getNextChairModeSpeaker(chat, groupMembers, chairSprite);
-
-                if (nextSpeaker === chairSprite) {
-                    // Only chair should speak
-                    selectedSprites = [chairSprite];
-                } else {
-                    // Chair called on someone - both chair and called sprite can speak
-                    selectedSprites = [chairSprite, nextSpeaker];
-                }
-                console.log('[Sprite Council] Chair mode: allowed speakers:', selectedSprites.join(', '));
+                // In Chair Mode, we use /trigger to force the correct character to generate
+                // We don't add system messages because they can cause characters to roleplay as each other
+                // The actual character forcing happens in the event listeners (message_sent, generation_ended)
+                console.log('[Sprite Council] Chair mode: using /trigger for character control, not adding system messages');
             }
             // KEYWORD MODE: Original behavior - select based on keywords
             else {
@@ -298,28 +291,28 @@
                 const messageContent = lastUserMsg.mes || "";
                 selectedSprites = selectSprites(messageContent, groupMembers);
                 console.log('[Sprite Council] Keyword mode: selected', selectedSprites.join(', '));
-            }
 
-            // Inject speaker restriction by adding a system message
-            // This tells Natural Order who should speak
-            if (selectedSprites.length > 0) {
-                // Remove any previous sprite-council-instruction messages
-                for (let i = chat.length - 1; i >= 0; i--) {
-                    if (chat[i].is_system && chat[i].mes && chat[i].mes.includes('<!-- sprite-council-instruction -->')) {
-                        chat.splice(i, 1);
+                // Inject speaker restriction by adding a system message
+                // This tells Natural Order who should speak (only in Keyword Mode)
+                if (selectedSprites.length > 0) {
+                    // Remove any previous sprite-council-instruction messages
+                    for (let i = chat.length - 1; i >= 0; i--) {
+                        if (chat[i].is_system && chat[i].mes && chat[i].mes.includes('<!-- sprite-council-instruction -->')) {
+                            chat.splice(i, 1);
+                        }
                     }
-                }
 
-                // Add instruction for who should speak
-                const speakerList = selectedSprites.join(', ');
-                const instructionMessage = {
-                    name: 'System',
-                    is_system: true,
-                    is_user: false,
-                    mes: `<!-- sprite-council-instruction -->\nONLY the following character(s) should respond to this message: ${speakerList}. All other characters must remain silent and not respond.`
-                };
-                chat.push(instructionMessage);
-                console.log(`[Sprite Council] Restricted speakers to: ${speakerList}`);
+                    // Add instruction for who should speak
+                    const speakerList = selectedSprites.join(', ');
+                    const instructionMessage = {
+                        name: 'System',
+                        is_system: true,
+                        is_user: false,
+                        mes: `<!-- sprite-council-instruction -->\nONLY the following character(s) should respond to this message: ${speakerList}. All other characters must remain silent and not respond.`
+                    };
+                    chat.push(instructionMessage);
+                    console.log(`[Sprite Council] Restricted speakers to: ${speakerList}`);
+                }
             }
 
             // Inject brevity instruction
@@ -932,21 +925,17 @@
             isChairModeForcing = true;
 
             // Force generation for this specific character using SillyTavern's trigger command
-            // Use the executeSlashCommands function with /trigger to force a specific character
-            if (typeof window.executeSlashCommandsWithOptions === 'function') {
-                window.executeSlashCommandsWithOptions(`/trigger ${nextSpeaker}`, { handleParserErrors: false, handleExecutionErrors: false });
-                // Clear flag after a short delay (generation is async)
-                setTimeout(() => {
-                    isChairModeForcing = false;
-                }, 500);
-            } else if (typeof window.executeSlashCommands === 'function') {
-                window.executeSlashCommands(`/trigger ${nextSpeaker}`);
+            // Use context.executeSlashCommands (accessed through SillyTavern.getContext())
+            if (context.executeSlashCommands && typeof context.executeSlashCommands === 'function') {
+                context.executeSlashCommands(`/trigger ${nextSpeaker}`);
+                console.log('[Sprite Council] Executed /trigger command for:', nextSpeaker);
                 // Clear flag after a short delay (generation is async)
                 setTimeout(() => {
                     isChairModeForcing = false;
                 }, 500);
             } else {
-                console.error('[Sprite Council] Slash command executor not available');
+                console.error('[Sprite Council] executeSlashCommands not available on context');
+                console.error('[Sprite Council] Available context methods:', Object.keys(context));
                 isChairModeForcing = false;
             }
 
@@ -1005,20 +994,16 @@
                     isChairModeForcing = true;
 
                     // Force generation for the called character using SillyTavern's trigger command
-                    if (typeof window.executeSlashCommandsWithOptions === 'function') {
-                        window.executeSlashCommandsWithOptions(`/trigger ${calledSprite}`, { handleParserErrors: false, handleExecutionErrors: false });
-                        // Clear flag after a short delay (generation is async)
-                        setTimeout(() => {
-                            isChairModeForcing = false;
-                        }, 500);
-                    } else if (typeof window.executeSlashCommands === 'function') {
-                        window.executeSlashCommands(`/trigger ${calledSprite}`);
+                    if (context.executeSlashCommands && typeof context.executeSlashCommands === 'function') {
+                        context.executeSlashCommands(`/trigger ${calledSprite}`);
+                        console.log('[Sprite Council] Executed /trigger command for:', calledSprite);
                         // Clear flag after a short delay (generation is async)
                         setTimeout(() => {
                             isChairModeForcing = false;
                         }, 500);
                     } else {
-                        console.error('[Sprite Council] Slash command executor not available');
+                        console.error('[Sprite Council] executeSlashCommands not available on context');
+                        console.error('[Sprite Council] Available context methods:', Object.keys(context));
                         isChairModeForcing = false;
                     }
                 }
