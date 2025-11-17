@@ -28,6 +28,9 @@
     let lastUserMessage = "";
     let isProcessingGroup = false;
 
+    // Guard flag to prevent duplicate event listener registration
+    let listenersRegistered = false;
+
     // Track when we're forcing a generation in Chair Mode (so we don't abort our own generations)
     let isChairModeForcing = false;
 
@@ -1135,6 +1138,12 @@
      * Register event listeners for Chair Mode and other features
      */
     function registerEventListeners() {
+        // Guard against duplicate registration
+        if (listenersRegistered) {
+            console.log('[Sprite Council] Event listeners already registered, skipping duplicate registration');
+            return true;
+        }
+
         // Get eventSource and event_types the proper way according to SillyTavern documentation
         // See: https://docs.sillytavern.app/for-contributors/writing-extensions/
         let eventSourceObj;
@@ -1204,6 +1213,7 @@
         });
 
         console.log('[Sprite Council] Event listeners registered successfully');
+        listenersRegistered = true;
         return true;
     }
 
