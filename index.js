@@ -7,6 +7,9 @@
 (function() {
     'use strict';
 
+    // Extension version
+    const EXTENSION_VERSION = '1.2.0';
+
     // Extension settings with defaults (no hardcoded sprites)
     const defaultSettings = {
         enabled: true,
@@ -1088,7 +1091,7 @@
      * Initialize the extension
      */
     function init() {
-        console.log('[Sprite Council] Extension loaded');
+        console.log(`[Sprite Council v${EXTENSION_VERSION}] Extension loaded`);
 
         // Load settings from storage
         loadSettings();
@@ -1129,7 +1132,7 @@
             }, 100);
         });
 
-        console.log('[Sprite Council] Initialization complete');
+        console.log(`[Sprite Council v${EXTENSION_VERSION}] Initialization complete`);
     }
 
     // Initialize when jQuery is ready
