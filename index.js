@@ -60,40 +60,48 @@
     /**
      * Detect if the chair is calling on a specific sprite in their message
      * Returns the sprite name if found, null otherwise
+     * Simple rule: if the chair mentions any sprite name (except themselves), that sprite gets freed to speak
      */
-    function detectCalledSprite(chairMessage, groupMembers) {
+    function detectCalledSprite(chairMessage, groupMembers, chairSprite) {
         if (!chairMessage) return null;
 
         const lowerMessage = chairMessage.toLowerCase();
 
-        // Patterns for calling on someone:
-        // "I call on X", "X, your turn", "let's hear from X", "X?", etc.
+        // Check each sprite name - if the chair mentions them, they're called
+        for (const member of groupMembers) {
+            // Skip if this is the chair themselves
+            if (member === chairSprite) continue;
+
+            const lowerName = member.toLowerCase();
+
+            // Simple rule: if the chair's message contains any other sprite's name, call on them
+            if (lowerMessage.includes(lowerName)) {
+                console.log(`[Sprite Council] Chair mentioned ${member}, freeing them to speak`);
+                return member;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Detect if the user mentioned a specific sprite in their message
+     * Returns the sprite name if found, null otherwise
+     * Simple rule: if the user mentions any sprite name, that sprite gets to respond
+     */
+    function detectUserMentionedSprite(userMessage, groupMembers) {
+        if (!userMessage) return null;
+
+        const lowerMessage = userMessage.toLowerCase();
+
+        // Check each sprite name - if the user mentions them, they get to respond
         for (const member of groupMembers) {
             const lowerName = member.toLowerCase();
 
-            // Direct patterns
-            const patterns = [
-                `i call on ${lowerName}`,
-                `calling on ${lowerName}`,
-                `i hereby call on ${lowerName}`,
-                `${lowerName}, your turn`,
-                `${lowerName}'s turn`,
-                `over to ${lowerName}`,
-                `let's hear from ${lowerName}`,
-                `${lowerName}, what`,
-                `${lowerName}, can you`,
-                `${lowerName}, could you`,
-                `${lowerName} only`,
-                `just ${lowerName}`,
-                `${lowerName} to say`,
-                `${lowerName} to respond`
-            ];
-
-            for (const pattern of patterns) {
-                if (lowerMessage.includes(pattern)) {
-                    console.log(`[Sprite Council] Chair called on: ${member} (pattern: "${pattern}")`);
-                    return member;
-                }
+            // Simple rule: if the user's message contains any sprite's name, call on them
+            if (lowerMessage.includes(lowerName)) {
+                console.log(`[Sprite Council] User mentioned ${member}, letting them respond directly`);
+                return member;
             }
         }
 
@@ -220,7 +228,13 @@
             // No messages yet, default to chair
             return chairSprite;
         } else if (lastMessage.is_user) {
-            // User just spoke → only chair should respond
+            // User just spoke → check if they mentioned a specific sprite
+            const mentionedSprite = detectUserMentionedSprite(lastMessage.mes, groupMembers);
+            if (mentionedSprite) {
+                console.log(`[Sprite Council] User mentioned ${mentionedSprite}, letting them respond`);
+                return mentionedSprite;
+            }
+            // No specific sprite mentioned → chair responds as normal
             return chairSprite;
         } else {
             // Last message from a character
@@ -228,7 +242,7 @@
 
             if (lastSpeaker === chairSprite) {
                 // Chair just spoke → check if they called on someone
-                const calledSprite = detectCalledSprite(lastMessage.mes, groupMembers);
+                const calledSprite = detectCalledSprite(lastMessage.mes, groupMembers, chairSprite);
                 if (calledSprite) {
                     console.log(`[Sprite Council] Chair called on ${calledSprite}`);
                     return calledSprite;
@@ -752,6 +766,68 @@
     }
 
     /**
+     * Toggle group activation strategy when Chair Mode is enabled/disabled
+     * When enabling Chair Mode: save current strategy and switch to MANUAL
+     * When disabling: restore the saved strategy
+     */
+    function toggleChairModeActivationStrategy(enableChairMode) {
+        try {
+            const context = SillyTavern.getContext();
+            if (!context.groupId) {
+                console.log('[Sprite Council] Not in a group chat, cannot change activation strategy');
+                return;
+            }
+
+            const group = context.groups.find(g => g.id === context.groupId);
+            if (!group) {
+                console.error('[Sprite Council] Current group not found');
+                return;
+            }
+
+            if (enableChairMode) {
+                // Save current activation strategy before switching to manual
+                if (typeof group.activation_strategy !== 'undefined') {
+                    spriteCouncilSettings.saved_activation_strategy = group.activation_strategy;
+                    console.log('[Sprite Council] Saved activation strategy:', group.activation_strategy);
+                }
+
+                // Switch to MANUAL mode (value 2)
+                group.activation_strategy = ACTIVATION_STRATEGY.MANUAL;
+                console.log('[Sprite Council] Switched to MANUAL activation mode for Chair Mode');
+
+                // Save the group settings
+                if (context.saveGroupsDebounced && typeof context.saveGroupsDebounced === 'function') {
+                    context.saveGroupsDebounced();
+                }
+
+                toastr.info('Group switched to Manual Mode for Chair Mode control');
+            } else {
+                // Restore previous activation strategy
+                if (spriteCouncilSettings.saved_activation_strategy !== null) {
+                    group.activation_strategy = spriteCouncilSettings.saved_activation_strategy;
+                    console.log('[Sprite Council] Restored activation strategy:', group.activation_strategy);
+
+                    // Clear the saved strategy
+                    spriteCouncilSettings.saved_activation_strategy = null;
+
+                    // Save the group settings
+                    if (context.saveGroupsDebounced && typeof context.saveGroupsDebounced === 'function') {
+                        context.saveGroupsDebounced();
+                    }
+
+                    const modeNames = ['Natural Order', 'Character List', 'Manual'];
+                    const modeName = modeNames[group.activation_strategy] || 'Unknown';
+                    toastr.info(`Group activation restored to: ${modeName}`);
+                } else {
+                    console.log('[Sprite Council] No saved activation strategy to restore');
+                }
+            }
+        } catch (error) {
+            console.error('[Sprite Council] Error toggling activation strategy:', error);
+        }
+    }
+
+    /**
      * Bind UI event listeners
      */
     function bindUIEvents() {
@@ -763,7 +839,13 @@
 
         // Chair Mode
         $('#sprite-council-chair-mode').on('change', function() {
-            spriteCouncilSettings.chair_mode = $(this).prop('checked');
+            const isEnabled = $(this).prop('checked');
+            spriteCouncilSettings.chair_mode = isEnabled;
+
+            // When enabling Chair Mode, switch group to Manual activation
+            // When disabling, restore the previous activation strategy
+            toggleChairModeActivationStrategy(isEnabled);
+
             saveSettings();
         });
 
@@ -986,7 +1068,7 @@
             // Only proceed if the last speaker was the chair
             if (lastSpeaker === chairSprite) {
                 // Check if the chair called on someone
-                const calledSprite = detectCalledSprite(lastMessage.mes, groupMembers);
+                const calledSprite = detectCalledSprite(lastMessage.mes, groupMembers, chairSprite);
                 if (calledSprite) {
                     console.log(`[Sprite Council] Chair called on ${calledSprite}, triggering their response`);
 
@@ -1131,6 +1213,15 @@
                 updateAddCharacterDropdown();
             }, 100);
         });
+
+        // If Chair Mode is already enabled on load, ensure group is in manual mode
+        // Wait a bit for SillyTavern to fully initialize
+        setTimeout(() => {
+            if (spriteCouncilSettings.chair_mode) {
+                console.log('[Sprite Council] Chair Mode is enabled, ensuring group is in manual mode');
+                toggleChairModeActivationStrategy(true);
+            }
+        }, 1000);
 
         console.log(`[Sprite Council v${EXTENSION_VERSION}] Initialization complete`);
     }
