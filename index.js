@@ -178,11 +178,19 @@
             console.log('[Sprite Council] getGroupMemberNames: group.members =', group.members);
             console.log('[Sprite Council] getGroupMemberNames: context.characters length =', context.characters?.length);
 
-            // group.members is an array of character IDs (chids) - numeric indexes into context.characters
+            // group.members can be either avatar filenames OR numeric character IDs depending on SillyTavern version
+            // We need to handle both cases
             const names = group.members
                 .map(memberId => {
-                    const char = context.characters[memberId];
-                    console.log(`[Sprite Council] getGroupMemberNames: memberId ${memberId} -> char:`, char);
+                    // Try numeric index first (for newer ST versions)
+                    let char = context.characters[memberId];
+
+                    // If that fails, try finding by avatar filename (for older ST versions)
+                    if (!char && typeof memberId === 'string') {
+                        char = context.characters.find(c => c.avatar === memberId);
+                    }
+
+                    console.log(`[Sprite Council] getGroupMemberNames: memberId ${memberId} -> char:`, char?.name || 'undefined');
                     return char;
                 })
                 .filter(Boolean)
