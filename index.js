@@ -77,8 +77,20 @@
 
             const lowerName = member.toLowerCase();
 
-            // Simple rule: if the chair's message contains any other sprite's name, call on them
-            if (lowerMessage.includes(lowerName)) {
+            // Extract first name (before "the" or first space)
+            let firstName = lowerName;
+            const theIndex = lowerName.indexOf(' the ');
+            if (theIndex !== -1) {
+                firstName = lowerName.substring(0, theIndex);
+            } else {
+                const spaceIndex = lowerName.indexOf(' ');
+                if (spaceIndex !== -1) {
+                    firstName = lowerName.substring(0, spaceIndex);
+                }
+            }
+
+            // Check if message contains the first name OR full name
+            if (lowerMessage.includes(firstName) || lowerMessage.includes(lowerName)) {
                 console.log(`[Sprite Council] Chair mentioned ${member}, freeing them to speak`);
                 return member;
             }
@@ -101,8 +113,20 @@
         for (const member of groupMembers) {
             const lowerName = member.toLowerCase();
 
-            // Simple rule: if the user's message contains any sprite's name, call on them
-            if (lowerMessage.includes(lowerName)) {
+            // Extract first name (before "the" or first space)
+            let firstName = lowerName;
+            const theIndex = lowerName.indexOf(' the ');
+            if (theIndex !== -1) {
+                firstName = lowerName.substring(0, theIndex);
+            } else {
+                const spaceIndex = lowerName.indexOf(' ');
+                if (spaceIndex !== -1) {
+                    firstName = lowerName.substring(0, spaceIndex);
+                }
+            }
+
+            // Check if message contains the first name OR full name
+            if (lowerMessage.includes(firstName) || lowerMessage.includes(lowerName)) {
                 console.log(`[Sprite Council] User mentioned ${member}, letting them respond directly`);
                 return member;
             }
