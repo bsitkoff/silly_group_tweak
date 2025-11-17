@@ -28,6 +28,9 @@
     let lastUserMessage = "";
     let isProcessingGroup = false;
 
+    // Guard flag to prevent duplicate event listener registration
+    let listenersRegistered = false;
+
     // Track when we're forcing a generation in Chair Mode (so we don't abort our own generations)
     let isChairModeForcing = false;
 
@@ -162,33 +165,38 @@
         try {
             const context = SillyTavern.getContext();
             if (!context.groupId) {
-                console.log('[Sprite Council] getGroupMemberNames: No groupId in context');
                 return null; // Not in a group chat
             }
 
-            console.log('[Sprite Council] getGroupMemberNames: groupId =', context.groupId);
-            console.log('[Sprite Council] getGroupMemberNames: context.groups =', context.groups);
-
             const group = context.groups.find(g => g.id === context.groupId);
             if (!group) {
-                console.log('[Sprite Council] getGroupMemberNames: No matching group found');
+                console.warn('[Sprite Council] Could not find group with ID:', context.groupId);
                 return null;
             }
 
-            console.log('[Sprite Council] getGroupMemberNames: group.members =', group.members);
-            console.log('[Sprite Council] getGroupMemberNames: context.characters length =', context.characters?.length);
-
-            // group.members is an array of character IDs (chids) - numeric indexes into context.characters
+            // group.members can be either avatar filenames OR numeric character IDs depending on SillyTavern version
+            // We need to handle both cases
             const names = group.members
                 .map(memberId => {
-                    const char = context.characters[memberId];
-                    console.log(`[Sprite Council] getGroupMemberNames: memberId ${memberId} -> char:`, char);
+                    // Try numeric index first (for newer ST versions)
+                    let char = context.characters[memberId];
+
+                    // If that fails, try finding by avatar filename (for older ST versions)
+                    if (!char && typeof memberId === 'string') {
+                        char = context.characters.find(c => c.avatar === memberId);
+                    }
+
+                    if (!char) {
+                        console.warn('[Sprite Council] Could not find character for member ID:', memberId);
+                    }
                     return char;
                 })
                 .filter(Boolean)
                 .map(char => char.name);
 
-            console.log('[Sprite Council] getGroupMemberNames: Final names =', names);
+            if (names.length === 0) {
+                console.warn('[Sprite Council] No valid group members found');
+            }
             return names;
         } catch (error) {
             console.error('[Sprite Council] Error getting group members:', error);
@@ -1127,6 +1135,12 @@
      * Register event listeners for Chair Mode and other features
      */
     function registerEventListeners() {
+        // Guard against duplicate registration
+        if (listenersRegistered) {
+            console.log('[Sprite Council] Event listeners already registered, skipping duplicate registration');
+            return true;
+        }
+
         // Get eventSource and event_types the proper way according to SillyTavern documentation
         // See: https://docs.sillytavern.app/for-contributors/writing-extensions/
         let eventSourceObj;
@@ -1196,6 +1210,7 @@
         });
 
         console.log('[Sprite Council] Event listeners registered successfully');
+        listenersRegistered = true;
         return true;
     }
 
