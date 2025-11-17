@@ -1049,9 +1049,9 @@
             console.log('[Sprite Council] Registering event listeners');
             console.log('[Sprite Council] eventSource:', eventSource);
 
-            // Listen for MESSAGE_SENT event (when user sends a message)
-            eventSource.on('MESSAGE_SENT', () => {
-                console.log('[Sprite Council] MESSAGE_SENT event received');
+            // Listen for message_sent event (when user sends a message)
+            eventSource.on('message_sent', () => {
+                console.log('[Sprite Council] message_sent event received');
 
                 // In Chair Mode, we manually trigger generation for the correct character
                 if (spriteCouncilSettings.enabled && spriteCouncilSettings.chair_mode && spriteCouncilSettings.chair_sprite) {
@@ -1074,14 +1074,14 @@
             });
 
             // Update dropdowns when group chat changes
-            eventSource.on('CHAT_CHANGED', () => {
+            eventSource.on('chat_changed', () => {
                 console.log('[Sprite Council] Chat changed - updating dropdowns');
                 updateChairSpriteDropdown();
                 updateAddCharacterDropdown();
             });
 
             // Also update when characters are added/removed from group
-            eventSource.on('GROUP_UPDATED', () => {
+            eventSource.on('group_updated', () => {
                 console.log('[Sprite Council] Group updated - updating dropdowns');
                 updateChairSpriteDropdown();
                 updateAddCharacterDropdown();
