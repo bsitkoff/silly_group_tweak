@@ -1030,6 +1030,61 @@
     }
 
     /**
+     * Register event listeners for Chair Mode and other features
+     */
+    function registerEventListeners() {
+        const eventSource = window.eventSource || window.SillyTavern?.eventSource;
+        if (!eventSource) {
+            console.error('[Sprite Council] eventSource not available, cannot register event listeners!');
+            return false;
+        }
+
+        console.log('[Sprite Council] Registering event listeners');
+        console.log('[Sprite Council] eventSource:', eventSource);
+
+        // Listen for message_sent event (when user sends a message)
+        eventSource.on('message_sent', () => {
+            console.log('[Sprite Council] message_sent event received');
+
+            // In Chair Mode, we manually trigger generation for the correct character
+            if (spriteCouncilSettings.enabled && spriteCouncilSettings.chair_mode && spriteCouncilSettings.chair_sprite) {
+                setTimeout(() => {
+                    handleChairModeGeneration();
+                }, 100); // Small delay to ensure message is fully processed
+            }
+        });
+
+        // Listen for generation_ended event (when AI finishes generating)
+        eventSource.on('generation_ended', () => {
+            console.log('[Sprite Council] generation_ended event received');
+
+            // In Chair Mode, check if we need to trigger the next speaker
+            if (spriteCouncilSettings.enabled && spriteCouncilSettings.chair_mode && spriteCouncilSettings.chair_sprite) {
+                setTimeout(() => {
+                    handleChairModeAfterGeneration();
+                }, 100); // Small delay to ensure generation is fully processed
+            }
+        });
+
+        // Update dropdowns when group chat changes
+        eventSource.on('chat_changed', () => {
+            console.log('[Sprite Council] Chat changed - updating dropdowns');
+            updateChairSpriteDropdown();
+            updateAddCharacterDropdown();
+        });
+
+        // Also update when characters are added/removed from group
+        eventSource.on('group_updated', () => {
+            console.log('[Sprite Council] Group updated - updating dropdowns');
+            updateChairSpriteDropdown();
+            updateAddCharacterDropdown();
+        });
+
+        console.log('[Sprite Council] Event listeners registered successfully');
+        return true;
+    }
+
+    /**
      * Initialize the extension
      */
     function init() {
@@ -1043,53 +1098,27 @@
         bindUIEvents();
         loadSettingsToUI();
 
-        // Listen to events
-        const eventSource = window.eventSource || window.SillyTavern?.eventSource;
-        if (eventSource) {
-            console.log('[Sprite Council] Registering event listeners');
-            console.log('[Sprite Council] eventSource:', eventSource);
+        // Try to register event listeners immediately
+        const registered = registerEventListeners();
 
-            // Listen for message_sent event (when user sends a message)
-            eventSource.on('message_sent', () => {
-                console.log('[Sprite Council] message_sent event received');
+        // If event source isn't ready yet, retry with backoff
+        if (!registered) {
+            console.log('[Sprite Council] EventSource not ready yet, will retry...');
+            let retryCount = 0;
+            const maxRetries = 10;
+            const retryInterval = setInterval(() => {
+                retryCount++;
+                console.log(`[Sprite Council] Retry ${retryCount}/${maxRetries} - attempting to register event listeners...`);
 
-                // In Chair Mode, we manually trigger generation for the correct character
-                if (spriteCouncilSettings.enabled && spriteCouncilSettings.chair_mode && spriteCouncilSettings.chair_sprite) {
-                    setTimeout(() => {
-                        handleChairModeGeneration();
-                    }, 100); // Small delay to ensure message is fully processed
+                const success = registerEventListeners();
+                if (success) {
+                    console.log('[Sprite Council] Event listeners registered successfully on retry');
+                    clearInterval(retryInterval);
+                } else if (retryCount >= maxRetries) {
+                    console.error('[Sprite Council] Failed to register event listeners after maximum retries');
+                    clearInterval(retryInterval);
                 }
-            });
-
-            // Listen for generation_ended event (when AI finishes generating)
-            eventSource.on('generation_ended', () => {
-                console.log('[Sprite Council] generation_ended event received');
-
-                // In Chair Mode, check if we need to trigger the next speaker
-                if (spriteCouncilSettings.enabled && spriteCouncilSettings.chair_mode && spriteCouncilSettings.chair_sprite) {
-                    setTimeout(() => {
-                        handleChairModeAfterGeneration();
-                    }, 100); // Small delay to ensure generation is fully processed
-                }
-            });
-
-            // Update dropdowns when group chat changes
-            eventSource.on('chat_changed', () => {
-                console.log('[Sprite Council] Chat changed - updating dropdowns');
-                updateChairSpriteDropdown();
-                updateAddCharacterDropdown();
-            });
-
-            // Also update when characters are added/removed from group
-            eventSource.on('group_updated', () => {
-                console.log('[Sprite Council] Group updated - updating dropdowns');
-                updateChairSpriteDropdown();
-                updateAddCharacterDropdown();
-            });
-
-            console.log('[Sprite Council] Event listeners registered successfully');
-        } else {
-            console.error('[Sprite Council] eventSource not available!');
+            }, 500); // Retry every 500ms
         }
 
         // Update dropdowns when settings panel is opened
