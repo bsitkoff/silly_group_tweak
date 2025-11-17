@@ -15,7 +15,8 @@
         brevity_enabled: true,
         brevity_instruction: "Reply in 3-5 sentences max unless the user specifically asks for more detail.",
         chair_sprite: "",
-        sprite_domains: {}
+        sprite_domains: {},
+        saved_activation_strategy: null  // Store original mode when Chair Mode is enabled
     };
 
     let spriteCouncilSettings = { ...defaultSettings };
@@ -26,6 +27,13 @@
 
     // Track when we're forcing a generation in Chair Mode (so we don't abort our own generations)
     let isChairModeForcing = false;
+
+    // Group chat activation strategies (SillyTavern constants)
+    const ACTIVATION_STRATEGY = {
+        NATURAL: 0,
+        LIST: 1,
+        MANUAL: 2  // Manual mode - no auto-selection
+    };
 
     /**
      * Score a sprite based on keyword matches in the message
