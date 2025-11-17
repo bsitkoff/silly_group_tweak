@@ -1044,9 +1044,14 @@
         loadSettingsToUI();
 
         // Listen to events
-        if (window.eventSource) {
+        const eventSource = window.eventSource || window.SillyTavern?.eventSource;
+        if (eventSource) {
+            console.log('[Sprite Council] Registering event listeners');
+            console.log('[Sprite Council] eventSource:', eventSource);
+
+            // Listen for MESSAGE_SENT event (when user sends a message)
             eventSource.on('MESSAGE_SENT', () => {
-                console.log('[Sprite Council] User message sent');
+                console.log('[Sprite Council] MESSAGE_SENT event received');
 
                 // In Chair Mode, we manually trigger generation for the correct character
                 if (spriteCouncilSettings.enabled && spriteCouncilSettings.chair_mode && spriteCouncilSettings.chair_sprite) {
@@ -1056,8 +1061,9 @@
                 }
             });
 
-            eventSource.on('GENERATION_ENDED', () => {
-                console.log('[Sprite Council] Generation ended');
+            // Listen for generation_ended event (when AI finishes generating)
+            eventSource.on('generation_ended', () => {
+                console.log('[Sprite Council] generation_ended event received');
 
                 // In Chair Mode, check if we need to trigger the next speaker
                 if (spriteCouncilSettings.enabled && spriteCouncilSettings.chair_mode && spriteCouncilSettings.chair_sprite) {
@@ -1080,6 +1086,10 @@
                 updateChairSpriteDropdown();
                 updateAddCharacterDropdown();
             });
+
+            console.log('[Sprite Council] Event listeners registered successfully');
+        } else {
+            console.error('[Sprite Council] eventSource not available!');
         }
 
         // Update dropdowns when settings panel is opened
