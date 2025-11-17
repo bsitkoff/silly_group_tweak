@@ -165,21 +165,14 @@
         try {
             const context = SillyTavern.getContext();
             if (!context.groupId) {
-                console.log('[Sprite Council] getGroupMemberNames: No groupId in context');
                 return null; // Not in a group chat
             }
 
-            console.log('[Sprite Council] getGroupMemberNames: groupId =', context.groupId);
-            console.log('[Sprite Council] getGroupMemberNames: context.groups =', context.groups);
-
             const group = context.groups.find(g => g.id === context.groupId);
             if (!group) {
-                console.log('[Sprite Council] getGroupMemberNames: No matching group found');
+                console.warn('[Sprite Council] Could not find group with ID:', context.groupId);
                 return null;
             }
-
-            console.log('[Sprite Council] getGroupMemberNames: group.members =', group.members);
-            console.log('[Sprite Council] getGroupMemberNames: context.characters length =', context.characters?.length);
 
             // group.members can be either avatar filenames OR numeric character IDs depending on SillyTavern version
             // We need to handle both cases
@@ -193,13 +186,17 @@
                         char = context.characters.find(c => c.avatar === memberId);
                     }
 
-                    console.log(`[Sprite Council] getGroupMemberNames: memberId ${memberId} -> char:`, char?.name || 'undefined');
+                    if (!char) {
+                        console.warn('[Sprite Council] Could not find character for member ID:', memberId);
+                    }
                     return char;
                 })
                 .filter(Boolean)
                 .map(char => char.name);
 
-            console.log('[Sprite Council] getGroupMemberNames: Final names =', names);
+            if (names.length === 0) {
+                console.warn('[Sprite Council] No valid group members found');
+            }
             return names;
         } catch (error) {
             console.error('[Sprite Council] Error getting group members:', error);
