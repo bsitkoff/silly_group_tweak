@@ -223,44 +223,57 @@
     }
 
     /**
-     * Force a character to reply by clicking their Force Talk button
-     * We wait for the button to appear in the DOM since it may not be rendered yet
+     * Force a character to reply using SillyTavern's internal group chat function
      */
-    function forceCharacterReply(chid) {
-        return new Promise((resolve) => {
-            try {
-                console.log('[Sprite Council] Forcing character with chid:', chid);
+    async function forceCharacterReply(chid) {
+        try {
+            console.log('[Sprite Council] Forcing character with chid:', chid);
 
-                // Try to find and click the Force Talk button, with retries
-                let attempts = 0;
-                const maxAttempts = 10; // Try for up to 1 second (10 * 100ms)
-
-                const tryClick = () => {
-                    attempts++;
-                    const button = document.querySelector(`.group-force-talk[data-chid="${chid}"]`);
-
-                    if (button) {
-                        console.log('[Sprite Council] Found Force Talk button, clicking...');
-                        button.click();
-                        resolve(true);
-                    } else if (attempts >= maxAttempts) {
-                        console.warn('[Sprite Council] Could not find Force Talk button after', attempts, 'attempts');
-                        console.log('[Sprite Council] Available buttons:',
-                            Array.from(document.querySelectorAll('.group-force-talk')).map(b => b.getAttribute('data-chid'))
-                        );
-                        resolve(false);
-                    } else {
-                        // Button not found yet, try again in 100ms
-                        setTimeout(tryClick, 100);
-                    }
-                };
-
-                tryClick();
-            } catch (error) {
-                console.error('[Sprite Council] Error forcing character reply:', error);
-                resolve(false);
+            // Try method 1: Call the internal SillyTavern function directly
+            if (typeof window.generateGroupWrapper !== 'undefined') {
+                console.log('[Sprite Council] Calling generateGroupWrapper with chid:', chid);
+                await window.generateGroupWrapper(false, '', chid);
+                return true;
             }
-        });
+
+            // Try method 2: Access via SillyTavern context
+            const context = SillyTavern.getContext();
+            if (context && typeof context.generateGroupWrapper === 'function') {
+                console.log('[Sprite Council] Calling context.generateGroupWrapper with chid:', chid);
+                await context.generateGroupWrapper(false, '', chid);
+                return true;
+            }
+
+            // Try method 3: Look for Force Talk button (fallback)
+            console.log('[Sprite Council] Trying Force Talk button as fallback...');
+            let attempts = 0;
+            const maxAttempts = 5;
+
+            while (attempts < maxAttempts) {
+                const button = document.querySelector(`.group-force-talk[data-chid="${chid}"]`);
+                if (button) {
+                    console.log('[Sprite Council] Found Force Talk button, clicking...');
+                    button.click();
+                    return true;
+                }
+                attempts++;
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+
+            console.warn('[Sprite Council] Could not force character reply - no method available');
+            console.log('[Sprite Council] Available methods:',
+                {
+                    generateGroupWrapper: typeof window.generateGroupWrapper,
+                    contextFunction: typeof context?.generateGroupWrapper,
+                    buttons: document.querySelectorAll('.group-force-talk').length
+                }
+            );
+            return false;
+
+        } catch (error) {
+            console.error('[Sprite Council] Error forcing character reply:', error);
+            return false;
+        }
     }
 
     /**
