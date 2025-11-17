@@ -60,40 +60,48 @@
     /**
      * Detect if the chair is calling on a specific sprite in their message
      * Returns the sprite name if found, null otherwise
+     * Simple rule: if the chair mentions any sprite name (except themselves), that sprite gets freed to speak
      */
-    function detectCalledSprite(chairMessage, groupMembers) {
+    function detectCalledSprite(chairMessage, groupMembers, chairSprite) {
         if (!chairMessage) return null;
 
         const lowerMessage = chairMessage.toLowerCase();
 
-        // Patterns for calling on someone:
-        // "I call on X", "X, your turn", "let's hear from X", "X?", etc.
+        // Check each sprite name - if the chair mentions them, they're called
+        for (const member of groupMembers) {
+            // Skip if this is the chair themselves
+            if (member === chairSprite) continue;
+
+            const lowerName = member.toLowerCase();
+
+            // Simple rule: if the chair's message contains any other sprite's name, call on them
+            if (lowerMessage.includes(lowerName)) {
+                console.log(`[Sprite Council] Chair mentioned ${member}, freeing them to speak`);
+                return member;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Detect if the user mentioned a specific sprite in their message
+     * Returns the sprite name if found, null otherwise
+     * Simple rule: if the user mentions any sprite name, that sprite gets to respond
+     */
+    function detectUserMentionedSprite(userMessage, groupMembers) {
+        if (!userMessage) return null;
+
+        const lowerMessage = userMessage.toLowerCase();
+
+        // Check each sprite name - if the user mentions them, they get to respond
         for (const member of groupMembers) {
             const lowerName = member.toLowerCase();
 
-            // Direct patterns
-            const patterns = [
-                `i call on ${lowerName}`,
-                `calling on ${lowerName}`,
-                `i hereby call on ${lowerName}`,
-                `${lowerName}, your turn`,
-                `${lowerName}'s turn`,
-                `over to ${lowerName}`,
-                `let's hear from ${lowerName}`,
-                `${lowerName}, what`,
-                `${lowerName}, can you`,
-                `${lowerName}, could you`,
-                `${lowerName} only`,
-                `just ${lowerName}`,
-                `${lowerName} to say`,
-                `${lowerName} to respond`
-            ];
-
-            for (const pattern of patterns) {
-                if (lowerMessage.includes(pattern)) {
-                    console.log(`[Sprite Council] Chair called on: ${member} (pattern: "${pattern}")`);
-                    return member;
-                }
+            // Simple rule: if the user's message contains any sprite's name, call on them
+            if (lowerMessage.includes(lowerName)) {
+                console.log(`[Sprite Council] User mentioned ${member}, letting them respond directly`);
+                return member;
             }
         }
 
@@ -220,7 +228,13 @@
             // No messages yet, default to chair
             return chairSprite;
         } else if (lastMessage.is_user) {
-            // User just spoke → only chair should respond
+            // User just spoke → check if they mentioned a specific sprite
+            const mentionedSprite = detectUserMentionedSprite(lastMessage.mes, groupMembers);
+            if (mentionedSprite) {
+                console.log(`[Sprite Council] User mentioned ${mentionedSprite}, letting them respond`);
+                return mentionedSprite;
+            }
+            // No specific sprite mentioned → chair responds as normal
             return chairSprite;
         } else {
             // Last message from a character
@@ -228,7 +242,7 @@
 
             if (lastSpeaker === chairSprite) {
                 // Chair just spoke → check if they called on someone
-                const calledSprite = detectCalledSprite(lastMessage.mes, groupMembers);
+                const calledSprite = detectCalledSprite(lastMessage.mes, groupMembers, chairSprite);
                 if (calledSprite) {
                     console.log(`[Sprite Council] Chair called on ${calledSprite}`);
                     return calledSprite;
@@ -1054,7 +1068,7 @@
             // Only proceed if the last speaker was the chair
             if (lastSpeaker === chairSprite) {
                 // Check if the chair called on someone
-                const calledSprite = detectCalledSprite(lastMessage.mes, groupMembers);
+                const calledSprite = detectCalledSprite(lastMessage.mes, groupMembers, chairSprite);
                 if (calledSprite) {
                     console.log(`[Sprite Council] Chair called on ${calledSprite}, triggering their response`);
 
