@@ -1040,26 +1040,33 @@
         // SillyTavern exposes eventSource as a global variable
         let eventSourceObj;
 
-        // Check window.eventSource first
-        if (typeof window.eventSource !== 'undefined' && window.eventSource) {
+        // Try to access eventSource as a bare global variable
+        try {
+            // Access via global scope - this is how most SillyTavern extensions do it
+            if (typeof eventSource !== 'undefined' && eventSource) {
+                eventSourceObj = eventSource;
+                console.log('[Sprite Council] Found event source via global eventSource');
+            }
+        } catch (e) {
+            // ReferenceError if eventSource doesn't exist
+            console.log('[Sprite Council] Global eventSource not accessible:', e.message);
+        }
+
+        // Check window.eventSource as fallback
+        if (!eventSourceObj && typeof window.eventSource !== 'undefined' && window.eventSource) {
             eventSourceObj = window.eventSource;
             console.log('[Sprite Council] Found event source via window.eventSource');
         }
-        // Fallback to SillyTavern.eventSource (without window prefix - checking global)
-        else if (typeof SillyTavern !== 'undefined' && SillyTavern.eventSource) {
+
+        // Check SillyTavern.eventSource as last resort
+        if (!eventSourceObj && typeof SillyTavern !== 'undefined' && SillyTavern.eventSource) {
             eventSourceObj = SillyTavern.eventSource;
             console.log('[Sprite Council] Found event source via SillyTavern.eventSource');
         }
 
         if (!eventSourceObj) {
             console.error('[Sprite Council] eventSource not available, cannot register event listeners!');
-            console.error('[Sprite Council] Debug - typeof window.eventSource:', typeof window.eventSource);
-            console.error('[Sprite Council] Debug - window.eventSource value:', window.eventSource);
-            console.error('[Sprite Council] Debug - typeof SillyTavern:', typeof SillyTavern);
-            if (typeof SillyTavern !== 'undefined') {
-                console.error('[Sprite Council] Debug - typeof SillyTavern.eventSource:', typeof SillyTavern.eventSource);
-                console.error('[Sprite Council] Debug - SillyTavern.eventSource value:', SillyTavern.eventSource);
-            }
+            console.error('[Sprite Council] Debug - tried global eventSource, window.eventSource, and SillyTavern.eventSource');
             return false;
         }
 
