@@ -923,21 +923,27 @@
                 return;
             }
 
-            console.log('[Sprite Council] Forcing generation for character ID:', chid);
+            console.log('[Sprite Council] Forcing generation for speaker:', nextSpeaker);
 
             // Set flag to allow our forced generation through the interceptor
             isChairModeForcing = true;
 
-            // Force generation for this specific character
-            // Using the global Generate function with force_chid parameter
-            if (typeof Generate === 'function') {
-                Generate('normal', { force_chid: chid });
+            // Force generation for this specific character using SillyTavern's trigger command
+            // Use the executeSlashCommands function with /trigger to force a specific character
+            if (typeof window.executeSlashCommandsWithOptions === 'function') {
+                window.executeSlashCommandsWithOptions(`/trigger ${nextSpeaker}`, { handleParserErrors: false, handleExecutionErrors: false });
+                // Clear flag after a short delay (generation is async)
+                setTimeout(() => {
+                    isChairModeForcing = false;
+                }, 500);
+            } else if (typeof window.executeSlashCommands === 'function') {
+                window.executeSlashCommands(`/trigger ${nextSpeaker}`);
                 // Clear flag after a short delay (generation is async)
                 setTimeout(() => {
                     isChairModeForcing = false;
                 }, 500);
             } else {
-                console.error('[Sprite Council] Generate function not available');
+                console.error('[Sprite Council] Slash command executor not available');
                 isChairModeForcing = false;
             }
 
@@ -992,25 +998,24 @@
                 if (calledSprite) {
                     console.log(`[Sprite Council] Chair called on ${calledSprite}, triggering their response`);
 
-                    // Get the character ID for the called sprite
-                    const chid = getCharacterIdByName(calledSprite);
-                    if (chid === null) {
-                        console.error('[Sprite Council] Could not find character ID for:', calledSprite);
-                        return;
-                    }
-
                     // Set flag to allow our forced generation through the interceptor
                     isChairModeForcing = true;
 
-                    // Force generation for the called character
-                    if (typeof Generate === 'function') {
-                        Generate('normal', { force_chid: chid });
+                    // Force generation for the called character using SillyTavern's trigger command
+                    if (typeof window.executeSlashCommandsWithOptions === 'function') {
+                        window.executeSlashCommandsWithOptions(`/trigger ${calledSprite}`, { handleParserErrors: false, handleExecutionErrors: false });
+                        // Clear flag after a short delay (generation is async)
+                        setTimeout(() => {
+                            isChairModeForcing = false;
+                        }, 500);
+                    } else if (typeof window.executeSlashCommands === 'function') {
+                        window.executeSlashCommands(`/trigger ${calledSprite}`);
                         // Clear flag after a short delay (generation is async)
                         setTimeout(() => {
                             isChairModeForcing = false;
                         }, 500);
                     } else {
-                        console.error('[Sprite Council] Generate function not available');
+                        console.error('[Sprite Council] Slash command executor not available');
                         isChairModeForcing = false;
                     }
                 }
