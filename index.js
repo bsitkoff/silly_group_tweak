@@ -1036,30 +1036,24 @@
      * Register event listeners for Chair Mode and other features
      */
     function registerEventListeners() {
-        // Try multiple ways to access the eventSource
-        // SillyTavern exposes eventSource as a global variable
+        // Get eventSource the proper way according to SillyTavern documentation
+        // See: https://docs.sillytavern.app/for-contributors/writing-extensions/
         let eventSourceObj;
 
-        // Check window.eventSource first
-        if (typeof window.eventSource !== 'undefined' && window.eventSource) {
-            eventSourceObj = window.eventSource;
-            console.log('[Sprite Council] Found event source via window.eventSource');
-        }
-        // Fallback to SillyTavern.eventSource (without window prefix - checking global)
-        else if (typeof SillyTavern !== 'undefined' && SillyTavern.eventSource) {
-            eventSourceObj = SillyTavern.eventSource;
-            console.log('[Sprite Council] Found event source via SillyTavern.eventSource');
+        try {
+            // The official way to access eventSource in SillyTavern extensions
+            const context = SillyTavern.getContext();
+            if (context && context.eventSource) {
+                eventSourceObj = context.eventSource;
+                console.log('[Sprite Council] Found event source via SillyTavern.getContext()');
+            }
+        } catch (e) {
+            console.error('[Sprite Council] Error accessing SillyTavern.getContext():', e.message);
         }
 
         if (!eventSourceObj) {
             console.error('[Sprite Council] eventSource not available, cannot register event listeners!');
-            console.error('[Sprite Council] Debug - typeof window.eventSource:', typeof window.eventSource);
-            console.error('[Sprite Council] Debug - window.eventSource value:', window.eventSource);
-            console.error('[Sprite Council] Debug - typeof SillyTavern:', typeof SillyTavern);
-            if (typeof SillyTavern !== 'undefined') {
-                console.error('[Sprite Council] Debug - typeof SillyTavern.eventSource:', typeof SillyTavern.eventSource);
-                console.error('[Sprite Council] Debug - SillyTavern.eventSource value:', SillyTavern.eventSource);
-            }
+            console.error('[Sprite Council] SillyTavern.getContext() did not provide eventSource');
             return false;
         }
 
