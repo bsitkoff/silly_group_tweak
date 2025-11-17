@@ -162,17 +162,34 @@
         try {
             const context = SillyTavern.getContext();
             if (!context.groupId) {
+                console.log('[Sprite Council] getGroupMemberNames: No groupId in context');
                 return null; // Not in a group chat
             }
 
+            console.log('[Sprite Council] getGroupMemberNames: groupId =', context.groupId);
+            console.log('[Sprite Council] getGroupMemberNames: context.groups =', context.groups);
+
             const group = context.groups.find(g => g.id === context.groupId);
-            if (!group) return null;
+            if (!group) {
+                console.log('[Sprite Council] getGroupMemberNames: No matching group found');
+                return null;
+            }
+
+            console.log('[Sprite Council] getGroupMemberNames: group.members =', group.members);
+            console.log('[Sprite Council] getGroupMemberNames: context.characters length =', context.characters?.length);
 
             // group.members is an array of character IDs (chids) - numeric indexes into context.characters
-            return group.members
-                .map(memberId => context.characters[memberId])
+            const names = group.members
+                .map(memberId => {
+                    const char = context.characters[memberId];
+                    console.log(`[Sprite Council] getGroupMemberNames: memberId ${memberId} -> char:`, char);
+                    return char;
+                })
                 .filter(Boolean)
                 .map(char => char.name);
+
+            console.log('[Sprite Council] getGroupMemberNames: Final names =', names);
+            return names;
         } catch (error) {
             console.error('[Sprite Council] Error getting group members:', error);
             return null;
