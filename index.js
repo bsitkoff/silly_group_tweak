@@ -168,16 +168,11 @@
             const group = context.groups.find(g => g.id === context.groupId);
             if (!group) return null;
 
-            // Get character names for group members
-            const memberNames = [];
-            for (const memberId of group.members) {
-                const char = context.characters.find(c => c.avatar === memberId);
-                if (char) {
-                    memberNames.push(char.name);
-                }
-            }
-
-            return memberNames;
+            // group.members is an array of character IDs (chids) - numeric indexes into context.characters
+            return group.members
+                .map(memberId => context.characters[memberId])
+                .filter(Boolean)
+                .map(char => char.name);
         } catch (error) {
             console.error('[Sprite Council] Error getting group members:', error);
             return null;
@@ -190,24 +185,32 @@
     function getCharacterIdByName(characterName) {
         try {
             const context = SillyTavern.getContext();
-            if (!context.groupId) return null;
-
-            const group = context.groups.find(g => g.id === context.groupId);
-            if (!group) return null;
-
-            // Find the character by name and return their avatar ID (used as chid)
-            for (const memberId of group.members) {
-                const char = context.characters.find(c => c.avatar === memberId);
-                if (char && char.name === characterName) {
-                    // Return the index in the characters array which is used as chid
-                    return context.characters.indexOf(char);
-                }
-            }
-
-            return null;
+            // Find character by name - the index in characters array is the chid
+            const idx = context.characters.findIndex(c => c.name === characterName);
+            return idx === -1 ? null : idx;
         } catch (error) {
             console.error('[Sprite Council] Error getting character ID:', error);
             return null;
+        }
+    }
+
+    /**
+     * Force a character to reply by clicking their Force Talk button
+     * This is the programmatic equivalent of clicking the speech bubble icon in the UI
+     */
+    function forceCharacterReply(chid) {
+        try {
+            const button = document.querySelector(`.group-force-talk[data-chid="${chid}"]`);
+            if (button) {
+                button.click(); // fires the same logic as the UI "💬" button
+                console.log('[Sprite Council] Clicked Force Talk button for chid:', chid);
+                return true;
+            }
+            console.warn('[Sprite Council] Could not find Force Talk button for chid', chid);
+            return false;
+        } catch (error) {
+            console.error('[Sprite Council] Error forcing character reply:', error);
+            return false;
         }
     }
 
@@ -1006,18 +1009,16 @@
             // Set flag to allow our forced generation through the interceptor
             isChairModeForcing = true;
 
-            // Force generation for this specific character using SillyTavern's trigger command
-            // Use context.executeSlashCommands (accessed through SillyTavern.getContext())
-            if (context.executeSlashCommands && typeof context.executeSlashCommands === 'function') {
-                context.executeSlashCommands(`/trigger ${nextSpeaker}`);
-                console.log('[Sprite Council] Executed /trigger command for:', nextSpeaker);
+            // Force generation by clicking the Force Talk button for this character
+            const success = forceCharacterReply(chid);
+            if (success) {
+                console.log('[Sprite Council] Successfully forced generation for:', nextSpeaker);
                 // Clear flag after a short delay (generation is async)
                 setTimeout(() => {
                     isChairModeForcing = false;
                 }, 500);
             } else {
-                console.error('[Sprite Council] executeSlashCommands not available on context');
-                console.error('[Sprite Council] Available context methods:', Object.keys(context));
+                console.error('[Sprite Council] Failed to force generation for:', nextSpeaker);
                 isChairModeForcing = false;
             }
 
@@ -1072,20 +1073,26 @@
                 if (calledSprite) {
                     console.log(`[Sprite Council] Chair called on ${calledSprite}, triggering their response`);
 
+                    // Get the character ID for the called sprite
+                    const chid = getCharacterIdByName(calledSprite);
+                    if (chid === null) {
+                        console.error('[Sprite Council] Could not find character ID for:', calledSprite);
+                        return;
+                    }
+
                     // Set flag to allow our forced generation through the interceptor
                     isChairModeForcing = true;
 
-                    // Force generation for the called character using SillyTavern's trigger command
-                    if (context.executeSlashCommands && typeof context.executeSlashCommands === 'function') {
-                        context.executeSlashCommands(`/trigger ${calledSprite}`);
-                        console.log('[Sprite Council] Executed /trigger command for:', calledSprite);
+                    // Force generation by clicking the Force Talk button for this character
+                    const success = forceCharacterReply(chid);
+                    if (success) {
+                        console.log('[Sprite Council] Successfully forced generation for:', calledSprite);
                         // Clear flag after a short delay (generation is async)
                         setTimeout(() => {
                             isChairModeForcing = false;
                         }, 500);
                     } else {
-                        console.error('[Sprite Council] executeSlashCommands not available on context');
-                        console.error('[Sprite Council] Available context methods:', Object.keys(context));
+                        console.error('[Sprite Council] Failed to force generation for:', calledSprite);
                         isChairModeForcing = false;
                     }
                 }
@@ -1103,15 +1110,17 @@
      * Register event listeners for Chair Mode and other features
      */
     function registerEventListeners() {
-        // Get eventSource the proper way according to SillyTavern documentation
+        // Get eventSource and event_types the proper way according to SillyTavern documentation
         // See: https://docs.sillytavern.app/for-contributors/writing-extensions/
         let eventSourceObj;
+        let eventTypes;
 
         try {
-            // The official way to access eventSource in SillyTavern extensions
+            // The official way to access eventSource and event_types in SillyTavern extensions
             const context = SillyTavern.getContext();
             if (context && context.eventSource) {
                 eventSourceObj = context.eventSource;
+                eventTypes = context.event_types;
                 console.log('[Sprite Council] Found event source via SillyTavern.getContext()');
             }
         } catch (e) {
@@ -1127,9 +1136,10 @@
         console.log('[Sprite Council] Registering event listeners');
         console.log('[Sprite Council] eventSource:', eventSourceObj);
 
-        // Listen for message_sent event (when user sends a message)
-        eventSourceObj.on('message_sent', () => {
-            console.log('[Sprite Council] message_sent event received');
+        // Listen for MESSAGE_SENT event (when user sends a message)
+        const messageSentEvent = eventTypes?.MESSAGE_SENT || 'message_sent';
+        eventSourceObj.on(messageSentEvent, () => {
+            console.log('[Sprite Council] MESSAGE_SENT event received');
 
             // In Chair Mode, we manually trigger generation for the correct character
             if (spriteCouncilSettings.enabled && spriteCouncilSettings.chair_mode && spriteCouncilSettings.chair_sprite) {
@@ -1139,9 +1149,10 @@
             }
         });
 
-        // Listen for generation_ended event (when AI finishes generating)
-        eventSourceObj.on('generation_ended', () => {
-            console.log('[Sprite Council] generation_ended event received');
+        // Listen for GENERATION_ENDED event (when AI finishes generating)
+        const generationEndedEvent = eventTypes?.GENERATION_ENDED || 'generation_ended';
+        eventSourceObj.on(generationEndedEvent, () => {
+            console.log('[Sprite Council] GENERATION_ENDED event received');
 
             // In Chair Mode, check if we need to trigger the next speaker
             if (spriteCouncilSettings.enabled && spriteCouncilSettings.chair_mode && spriteCouncilSettings.chair_sprite) {
@@ -1152,14 +1163,16 @@
         });
 
         // Update dropdowns when group chat changes
-        eventSourceObj.on('chat_changed', () => {
+        const chatChangedEvent = eventTypes?.CHAT_CHANGED || 'chat_changed';
+        eventSourceObj.on(chatChangedEvent, () => {
             console.log('[Sprite Council] Chat changed - updating dropdowns');
             updateChairSpriteDropdown();
             updateAddCharacterDropdown();
         });
 
         // Also update when characters are added/removed from group
-        eventSourceObj.on('group_updated', () => {
+        const groupUpdatedEvent = eventTypes?.GROUP_UPDATED || 'group_updated';
+        eventSourceObj.on(groupUpdatedEvent, () => {
             console.log('[Sprite Council] Group updated - updating dropdowns');
             updateChairSpriteDropdown();
             updateAddCharacterDropdown();
