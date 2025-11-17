@@ -210,8 +210,15 @@
     function getCharacterIdByName(characterName) {
         try {
             const context = SillyTavern.getContext();
+
+            console.log('[Sprite Council] getCharacterIdByName: Looking for character:', characterName);
+            console.log('[Sprite Council] getCharacterIdByName: Available characters:',
+                context.characters.map((c, idx) => ({ idx, name: c.name, avatar: c.avatar }))
+            );
+
             // Find character by name - the index in characters array is the chid
             const idx = context.characters.findIndex(c => c.name === characterName);
+            console.log('[Sprite Council] getCharacterIdByName: Found index:', idx);
             return idx === -1 ? null : idx;
         } catch (error) {
             console.error('[Sprite Council] Error getting character ID:', error);
@@ -225,6 +232,18 @@
      */
     function forceCharacterReply(chid) {
         try {
+            console.log('[Sprite Council] Looking for Force Talk button with chid:', chid);
+
+            // Debug: list all available Force Talk buttons
+            const allButtons = document.querySelectorAll('.group-force-talk');
+            console.log('[Sprite Council] Available Force Talk buttons:',
+                Array.from(allButtons).map(b => ({
+                    chid: b.getAttribute('data-chid'),
+                    title: b.getAttribute('title'),
+                    visible: b.offsetParent !== null
+                }))
+            );
+
             const button = document.querySelector(`.group-force-talk[data-chid="${chid}"]`);
             if (button) {
                 button.click(); // fires the same logic as the UI "💬" button
