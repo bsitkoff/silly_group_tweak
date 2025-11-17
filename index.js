@@ -257,19 +257,17 @@
             if (spriteCouncilSettings.chair_mode && chairSprite) {
                 console.log('[Sprite Council] Chair mode active, chair:', chairSprite);
 
-                // Don't abort if we're forcing a generation ourselves
-                if (isChairModeForcing) {
-                    console.log('[Sprite Council] Allowing forced generation to proceed');
-                    // Determine which character should speak and restrict to them only
-                    const nextSpeaker = getNextChairModeSpeaker(chat, groupMembers, chairSprite);
-                    selectedSprites = [nextSpeaker];
-                    console.log('[Sprite Council] Chair mode: restricting to speaker:', nextSpeaker);
+                // Chair can always speak. Determine if anyone else should also be allowed.
+                const nextSpeaker = getNextChairModeSpeaker(chat, groupMembers, chairSprite);
+
+                if (nextSpeaker === chairSprite) {
+                    // Only chair should speak
+                    selectedSprites = [chairSprite];
                 } else {
-                    // Abort auto-generation - we'll handle it manually via MESSAGE_SENT
-                    console.log('[Sprite Council] Aborting auto-generation, will force manually');
-                    abort(true);
-                    return;
+                    // Chair called on someone - both chair and called sprite can speak
+                    selectedSprites = [chairSprite, nextSpeaker];
                 }
+                console.log('[Sprite Council] Chair mode: allowed speakers:', selectedSprites.join(', '));
             }
             // KEYWORD MODE: Original behavior - select based on keywords
             else {
