@@ -1036,37 +1036,24 @@
      * Register event listeners for Chair Mode and other features
      */
     function registerEventListeners() {
-        // Try multiple ways to access the eventSource
-        // SillyTavern exposes eventSource as a global variable
+        // Get eventSource the proper way according to SillyTavern documentation
+        // See: https://docs.sillytavern.app/for-contributors/writing-extensions/
         let eventSourceObj;
 
-        // Try to access eventSource as a bare global variable
         try {
-            // Access via global scope - this is how most SillyTavern extensions do it
-            if (typeof eventSource !== 'undefined' && eventSource) {
-                eventSourceObj = eventSource;
-                console.log('[Sprite Council] Found event source via global eventSource');
+            // The official way to access eventSource in SillyTavern extensions
+            const context = SillyTavern.getContext();
+            if (context && context.eventSource) {
+                eventSourceObj = context.eventSource;
+                console.log('[Sprite Council] Found event source via SillyTavern.getContext()');
             }
         } catch (e) {
-            // ReferenceError if eventSource doesn't exist
-            console.log('[Sprite Council] Global eventSource not accessible:', e.message);
-        }
-
-        // Check window.eventSource as fallback
-        if (!eventSourceObj && typeof window.eventSource !== 'undefined' && window.eventSource) {
-            eventSourceObj = window.eventSource;
-            console.log('[Sprite Council] Found event source via window.eventSource');
-        }
-
-        // Check SillyTavern.eventSource as last resort
-        if (!eventSourceObj && typeof SillyTavern !== 'undefined' && SillyTavern.eventSource) {
-            eventSourceObj = SillyTavern.eventSource;
-            console.log('[Sprite Council] Found event source via SillyTavern.eventSource');
+            console.error('[Sprite Council] Error accessing SillyTavern.getContext():', e.message);
         }
 
         if (!eventSourceObj) {
             console.error('[Sprite Council] eventSource not available, cannot register event listeners!');
-            console.error('[Sprite Council] Debug - tried global eventSource, window.eventSource, and SillyTavern.eventSource');
+            console.error('[Sprite Council] SillyTavern.getContext() did not provide eventSource');
             return false;
         }
 
