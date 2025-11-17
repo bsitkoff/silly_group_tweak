@@ -752,6 +752,68 @@
     }
 
     /**
+     * Toggle group activation strategy when Chair Mode is enabled/disabled
+     * When enabling Chair Mode: save current strategy and switch to MANUAL
+     * When disabling: restore the saved strategy
+     */
+    function toggleChairModeActivationStrategy(enableChairMode) {
+        try {
+            const context = SillyTavern.getContext();
+            if (!context.groupId) {
+                console.log('[Sprite Council] Not in a group chat, cannot change activation strategy');
+                return;
+            }
+
+            const group = context.groups.find(g => g.id === context.groupId);
+            if (!group) {
+                console.error('[Sprite Council] Current group not found');
+                return;
+            }
+
+            if (enableChairMode) {
+                // Save current activation strategy before switching to manual
+                if (typeof group.activation_strategy !== 'undefined') {
+                    spriteCouncilSettings.saved_activation_strategy = group.activation_strategy;
+                    console.log('[Sprite Council] Saved activation strategy:', group.activation_strategy);
+                }
+
+                // Switch to MANUAL mode (value 2)
+                group.activation_strategy = ACTIVATION_STRATEGY.MANUAL;
+                console.log('[Sprite Council] Switched to MANUAL activation mode for Chair Mode');
+
+                // Save the group settings
+                if (context.saveGroupsDebounced && typeof context.saveGroupsDebounced === 'function') {
+                    context.saveGroupsDebounced();
+                }
+
+                toastr.info('Group switched to Manual Mode for Chair Mode control');
+            } else {
+                // Restore previous activation strategy
+                if (spriteCouncilSettings.saved_activation_strategy !== null) {
+                    group.activation_strategy = spriteCouncilSettings.saved_activation_strategy;
+                    console.log('[Sprite Council] Restored activation strategy:', group.activation_strategy);
+
+                    // Clear the saved strategy
+                    spriteCouncilSettings.saved_activation_strategy = null;
+
+                    // Save the group settings
+                    if (context.saveGroupsDebounced && typeof context.saveGroupsDebounced === 'function') {
+                        context.saveGroupsDebounced();
+                    }
+
+                    const modeNames = ['Natural Order', 'Character List', 'Manual'];
+                    const modeName = modeNames[group.activation_strategy] || 'Unknown';
+                    toastr.info(`Group activation restored to: ${modeName}`);
+                } else {
+                    console.log('[Sprite Council] No saved activation strategy to restore');
+                }
+            }
+        } catch (error) {
+            console.error('[Sprite Council] Error toggling activation strategy:', error);
+        }
+    }
+
+    /**
      * Bind UI event listeners
      */
     function bindUIEvents() {
@@ -763,7 +825,13 @@
 
         // Chair Mode
         $('#sprite-council-chair-mode').on('change', function() {
-            spriteCouncilSettings.chair_mode = $(this).prop('checked');
+            const isEnabled = $(this).prop('checked');
+            spriteCouncilSettings.chair_mode = isEnabled;
+
+            // When enabling Chair Mode, switch group to Manual activation
+            // When disabling, restore the previous activation strategy
+            toggleChairModeActivationStrategy(isEnabled);
+
             saveSettings();
         });
 
@@ -1131,6 +1199,15 @@
                 updateAddCharacterDropdown();
             }, 100);
         });
+
+        // If Chair Mode is already enabled on load, ensure group is in manual mode
+        // Wait a bit for SillyTavern to fully initialize
+        setTimeout(() => {
+            if (spriteCouncilSettings.chair_mode) {
+                console.log('[Sprite Council] Chair Mode is enabled, ensuring group is in manual mode');
+                toggleChairModeActivationStrategy(true);
+            }
+        }, 1000);
 
         console.log(`[Sprite Council v${EXTENSION_VERSION}] Initialization complete`);
     }
