@@ -234,15 +234,11 @@
     function getCharacterIdByName(characterName) {
         try {
             const context = SillyTavern.getContext();
-
-            console.log('[Sprite Council] getCharacterIdByName: Looking for character:', characterName);
-            console.log('[Sprite Council] getCharacterIdByName: Available characters:',
-                context.characters.map((c, idx) => ({ idx, name: c.name, avatar: c.avatar }))
-            );
-
             // Find character by name - the index in characters array is the chid
             const idx = context.characters.findIndex(c => c.name === characterName);
-            console.log('[Sprite Council] getCharacterIdByName: Found index:', idx);
+            if (idx === -1) {
+                console.warn('[Sprite Council] Could not find character ID for:', characterName);
+            }
             return idx === -1 ? null : idx;
         } catch (error) {
             console.error('[Sprite Council] Error getting character ID:', error);
@@ -252,34 +248,43 @@
 
     /**
      * Force a character to reply by clicking their Force Talk button
-     * This is the programmatic equivalent of clicking the speech bubble icon in the UI
+     * We wait for the button to appear in the DOM since it may not be rendered yet
      */
     function forceCharacterReply(chid) {
-        try {
-            console.log('[Sprite Council] Looking for Force Talk button with chid:', chid);
+        return new Promise((resolve) => {
+            try {
+                console.log('[Sprite Council] Forcing character with chid:', chid);
 
-            // Debug: list all available Force Talk buttons
-            const allButtons = document.querySelectorAll('.group-force-talk');
-            console.log('[Sprite Council] Available Force Talk buttons:',
-                Array.from(allButtons).map(b => ({
-                    chid: b.getAttribute('data-chid'),
-                    title: b.getAttribute('title'),
-                    visible: b.offsetParent !== null
-                }))
-            );
+                // Try to find and click the Force Talk button, with retries
+                let attempts = 0;
+                const maxAttempts = 10; // Try for up to 1 second (10 * 100ms)
 
-            const button = document.querySelector(`.group-force-talk[data-chid="${chid}"]`);
-            if (button) {
-                button.click(); // fires the same logic as the UI "💬" button
-                console.log('[Sprite Council] Clicked Force Talk button for chid:', chid);
-                return true;
+                const tryClick = () => {
+                    attempts++;
+                    const button = document.querySelector(`.group-force-talk[data-chid="${chid}"]`);
+
+                    if (button) {
+                        console.log('[Sprite Council] Found Force Talk button, clicking...');
+                        button.click();
+                        resolve(true);
+                    } else if (attempts >= maxAttempts) {
+                        console.warn('[Sprite Council] Could not find Force Talk button after', attempts, 'attempts');
+                        console.log('[Sprite Council] Available buttons:',
+                            Array.from(document.querySelectorAll('.group-force-talk')).map(b => b.getAttribute('data-chid'))
+                        );
+                        resolve(false);
+                    } else {
+                        // Button not found yet, try again in 100ms
+                        setTimeout(tryClick, 100);
+                    }
+                };
+
+                tryClick();
+            } catch (error) {
+                console.error('[Sprite Council] Error forcing character reply:', error);
+                resolve(false);
             }
-            console.warn('[Sprite Council] Could not find Force Talk button for chid', chid);
-            return false;
-        } catch (error) {
-            console.error('[Sprite Council] Error forcing character reply:', error);
-            return false;
-        }
+        });
     }
 
     /**
@@ -1072,23 +1077,24 @@
                 return;
             }
 
-            console.log('[Sprite Council] Forcing generation for speaker:', nextSpeaker);
+            console.log('[Sprite Council] Forcing generation for speaker:', nextSpeaker, '(chid:', chid + ')');
 
             // Set flag to allow our forced generation through the interceptor
             isChairModeForcing = true;
 
-            // Force generation by clicking the Force Talk button for this character
-            const success = forceCharacterReply(chid);
-            if (success) {
-                console.log('[Sprite Council] Successfully forced generation for:', nextSpeaker);
-                // Clear flag after a short delay (generation is async)
-                setTimeout(() => {
+            // Force generation by clicking the Force Talk button (async with retries)
+            forceCharacterReply(chid).then(success => {
+                if (success) {
+                    console.log('[Sprite Council] Successfully forced generation for:', nextSpeaker);
+                    // Clear flag after a short delay (generation is async)
+                    setTimeout(() => {
+                        isChairModeForcing = false;
+                    }, 500);
+                } else {
+                    console.error('[Sprite Council] Failed to force generation for:', nextSpeaker);
                     isChairModeForcing = false;
-                }, 500);
-            } else {
-                console.error('[Sprite Council] Failed to force generation for:', nextSpeaker);
-                isChairModeForcing = false;
-            }
+                }
+            });
 
         } catch (error) {
             console.error('[Sprite Council] Error in handleChairModeGeneration:', error);
